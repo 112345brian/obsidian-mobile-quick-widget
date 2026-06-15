@@ -1,8 +1,3 @@
-/* Darken the screen behind the pie using Obsidian's modal-bg overlay */
-.qw-modal-container .modal-bg {
-  opacity: 1 !important;
-  background: rgba(0, 0, 0, 0.55);
-}
 
 .qw-modal {
   background: transparent;

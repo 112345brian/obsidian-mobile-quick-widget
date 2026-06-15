@@ -51,9 +51,14 @@ export class RadialMenuModal extends Modal {
   public override onOpen(): void {
     const { modalEl, contentEl } = this;
     modalEl.addClass('qw-modal');
-    // Apply dimming to the container that wraps the modal and its bg overlay
-    modalEl.parentElement?.addClass('qw-modal-container');
     contentEl.addClass('qw-content');
+
+    // Darken the note content behind the overlay
+    const bg = this.containerEl.querySelector<HTMLElement>('.modal-bg');
+    if (bg) {
+      bg.style.backgroundColor = 'rgba(0, 0, 0, 0.55)';
+      bg.style.opacity = '1';
+    }
 
     const size = Math.min(window.innerWidth, window.innerHeight) * 0.85;
     const cx = size / 2;
