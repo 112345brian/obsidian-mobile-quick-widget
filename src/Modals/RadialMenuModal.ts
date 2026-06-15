@@ -51,6 +51,7 @@ export class RadialMenuModal extends Modal {
   public override onOpen(): void {
     const { modalEl, contentEl } = this;
     modalEl.addClass('qw-modal');
+    modalEl.querySelector('.modal-close-button')?.remove();
     contentEl.addClass('qw-content');
 
     // Darken the note content behind the overlay
