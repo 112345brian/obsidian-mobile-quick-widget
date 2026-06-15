@@ -51,6 +51,8 @@ export class RadialMenuModal extends Modal {
   public override onOpen(): void {
     const { modalEl, contentEl } = this;
     modalEl.addClass('qw-modal');
+    // Apply dimming to the container that wraps the modal and its bg overlay
+    modalEl.parentElement?.addClass('qw-modal-container');
     contentEl.addClass('qw-content');
 
     const size = Math.min(window.innerWidth, window.innerHeight) * 0.85;
@@ -70,25 +72,28 @@ export class RadialMenuModal extends Modal {
       svg.appendChild(g);
     }
 
-    const centerBg = document.createElementNS(SVG_NS, 'circle');
-    centerBg.setAttribute('cx', String(cx));
-    centerBg.setAttribute('cy', String(cy));
-    centerBg.setAttribute('r', String(innerR - 4));
-    centerBg.addClass('qw-center');
-    svg.appendChild(centerBg);
+    const hasCancelSlice = this.settings.slices.some((s) => s.action === 'cancel');
+    if (!hasCancelSlice) {
+      const centerBg = document.createElementNS(SVG_NS, 'circle');
+      centerBg.setAttribute('cx', String(cx));
+      centerBg.setAttribute('cy', String(cy));
+      centerBg.setAttribute('r', String(innerR - 4));
+      centerBg.addClass('qw-center');
+      svg.appendChild(centerBg);
 
-    const centerText = document.createElementNS(SVG_NS, 'text');
-    centerText.setAttribute('x', String(cx));
-    centerText.setAttribute('y', String(cy));
-    centerText.setAttribute('text-anchor', 'middle');
-    centerText.setAttribute('dominant-baseline', 'middle');
-    centerText.addClass('qw-center-icon');
-    centerText.textContent = '✕';
-    svg.appendChild(centerText);
+      const centerText = document.createElementNS(SVG_NS, 'text');
+      centerText.setAttribute('x', String(cx));
+      centerText.setAttribute('y', String(cy));
+      centerText.setAttribute('text-anchor', 'middle');
+      centerText.setAttribute('dominant-baseline', 'middle');
+      centerText.addClass('qw-center-icon');
+      centerText.textContent = '✕';
+      svg.appendChild(centerText);
 
-    const closeCenter = (): void => { this.close(); };
-    centerBg.addEventListener('click', closeCenter);
-    centerText.addEventListener('click', closeCenter);
+      const closeCenter = (): void => { this.close(); };
+      centerBg.addEventListener('click', closeCenter);
+      centerText.addEventListener('click', closeCenter);
+    }
 
     contentEl.appendChild(svg);
 

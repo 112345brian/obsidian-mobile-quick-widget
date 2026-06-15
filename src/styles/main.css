@@ -1,3 +1,9 @@
+/* Darken the screen behind the pie using Obsidian's modal-bg overlay */
+.qw-modal-container .modal-bg {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.55);
+}
+
 .qw-modal {
   background: transparent;
   border: none;
@@ -9,17 +15,17 @@
   max-height: 100%;
   margin: 0;
   padding: 0;
+}
 
-  .modal-close-button {
-    display: none;
-  }
+.qw-modal .modal-close-button {
+  display: none;
+}
 
-  .modal-content {
-    background: transparent;
-    box-shadow: none;
-    padding: 0;
-    height: 100%;
-  }
+.qw-modal .modal-content {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  height: 100%;
 }
 
 .qw-content {
