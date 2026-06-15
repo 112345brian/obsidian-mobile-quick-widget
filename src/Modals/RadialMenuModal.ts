@@ -1,12 +1,16 @@
 import type { App } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
-import { Modal, TFile } from 'obsidian';
+import { Modal, Notice } from 'obsidian';
 
 import type { PluginSettings, SliceConfig } from '../PluginSettings.ts';
 
+import { createNote } from '../createNote.ts';
+import { DashboardModal } from './DashboardModal.ts';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const GAP_DEG = 1.5;
+
+const GAP_DEG = 2;
 
 function deg2rad(deg: number): number {
   return (deg * Math.PI) / 180;
@@ -53,25 +57,21 @@ export class RadialMenuModal extends Modal {
     modalEl.addClass('qw-modal');
     contentEl.addClass('qw-content');
 
-    // Remove the close button — deferred because Obsidian may append it after onOpen()
-    setTimeout(() => {
-      for (const el of modalEl.querySelectorAll<HTMLElement>('.modal-close-button')) {
-        el.remove();
-      }
-    }, 0);
-
-    // Darken the note content behind the overlay
     const bg = this.containerEl.querySelector<HTMLElement>('.modal-bg');
     if (bg) {
-      bg.style.backgroundColor = 'rgba(0, 0, 0, 0.55)';
-      bg.style.opacity = '1';
+      bg.style.setProperty('opacity', '1');
+      bg.style.setProperty('background', 'rgba(0,0,0,0.5)');
+      bg.style.setProperty('backdrop-filter', 'blur(6px)');
+      bg.style.setProperty('-webkit-backdrop-filter', 'blur(6px)');
     }
 
-    const size = Math.min(window.innerWidth, window.innerHeight) * 0.85;
+    const w = activeWindow.innerWidth;
+    const h = activeWindow.innerHeight;
+    const size = Math.min(w, h) * 0.85;
     const cx = size / 2;
     const cy = size / 2;
     const outerR = size / 2 - 8;
-    const innerR = outerR * 0.32;
+    const innerR = outerR * 0.28;
 
     const svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
@@ -79,10 +79,12 @@ export class RadialMenuModal extends Modal {
     svg.setAttribute('height', String(size));
     svg.addClass('qw-svg');
 
-    for (const slice of this.settings.slices) {
-      const g = this.makeSliceGroup(cx, cy, outerR, innerR, slice);
+    this.settings.slices.forEach((slice, i) => {
+      const span = slice.endAngle - slice.startAngle;
+      if (span <= GAP_DEG * 2) return;
+      const g = this.makeSliceGroup(cx, cy, outerR, innerR, slice, i);
       svg.appendChild(g);
-    }
+    });
 
     const hasCancelSlice = this.settings.slices.some((s) => s.action === 'cancel');
     if (!hasCancelSlice) {
@@ -112,6 +114,10 @@ export class RadialMenuModal extends Modal {
     modalEl.addEventListener('click', (e) => {
       if (e.target === modalEl || e.target === contentEl) this.close();
     });
+
+    requestAnimationFrame(() => {
+      svg.addClass('qw-svg--open');
+    });
   }
 
   public override onClose(): void {
@@ -121,10 +127,12 @@ export class RadialMenuModal extends Modal {
   private makeSliceGroup(
     cx: number, cy: number,
     outerR: number, innerR: number,
-    slice: ReadonlyDeep<SliceConfig>
+    slice: ReadonlyDeep<SliceConfig>,
+    index: number
   ): SVGGElement {
     const g = document.createElementNS(SVG_NS, 'g') as SVGGElement;
     g.addClass('qw-slice-group');
+    g.style.setProperty('--i', String(index));
 
     const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', makeArcPath(cx, cy, outerR, innerR, slice.startAngle, slice.endAngle));
@@ -136,23 +144,31 @@ export class RadialMenuModal extends Modal {
     const labelR = (outerR + innerR) / 2;
     const lp = polarXY(cx, cy, labelR, mid);
 
+    // Scale icon/label offset to the radial depth so they don't overlap on narrow slices
+    const depth = outerR - innerR;
+    const offset = Math.min(12, depth * 0.2);
+
     const iconEl = document.createElementNS(SVG_NS, 'text');
     iconEl.setAttribute('x', String(lp.x));
-    iconEl.setAttribute('y', String(lp.y - 12));
+    iconEl.setAttribute('y', String(lp.y - offset));
     iconEl.setAttribute('text-anchor', 'middle');
     iconEl.setAttribute('dominant-baseline', 'middle');
     iconEl.addClass('qw-icon');
     iconEl.textContent = slice.icon;
     g.appendChild(iconEl);
 
-    const labelEl = document.createElementNS(SVG_NS, 'text');
-    labelEl.setAttribute('x', String(lp.x));
-    labelEl.setAttribute('y', String(lp.y + 14));
-    labelEl.setAttribute('text-anchor', 'middle');
-    labelEl.setAttribute('dominant-baseline', 'middle');
-    labelEl.addClass('qw-label');
-    labelEl.textContent = slice.label;
-    g.appendChild(labelEl);
+    // Hide label on slices narrower than 45° to avoid overflow
+    const span = slice.endAngle - slice.startAngle;
+    if (span >= 45) {
+      const labelEl = document.createElementNS(SVG_NS, 'text');
+      labelEl.setAttribute('x', String(lp.x));
+      labelEl.setAttribute('y', String(lp.y + offset + 4));
+      labelEl.setAttribute('text-anchor', 'middle');
+      labelEl.setAttribute('dominant-baseline', 'middle');
+      labelEl.addClass('qw-label');
+      labelEl.textContent = slice.label;
+      g.appendChild(labelEl);
+    }
 
     g.addEventListener('click', () => { void this.handleSlice(slice); });
     return g;
@@ -165,41 +181,41 @@ export class RadialMenuModal extends Modal {
       case 'cancel':
         break;
 
+      case 'dashboard': {
+        new DashboardModal(this.app, this.settings).open();
+        break;
+      }
+
       case 'homepage': {
         const target = this.settings.homePath;
         if (target) {
-          const file = this.app.vault.getAbstractFileByPath(target);
-          if (file instanceof TFile) {
+          const file = this.app.vault.getFileByPath(target);
+          if (file) {
             await this.app.workspace.getMostRecentLeaf()?.openFile(file);
             return;
           }
         }
-        // Fall back to the Homepage plugin command if installed
-        (this.app as unknown as { commands: { executeCommandById: (id: string) => void } })
-          .commands.executeCommandById('homepage:open');
+        try {
+          if (this.app.commands.findCommand('homepage:open')) {
+            this.app.commands.executeCommandById('homepage:open');
+          } else {
+            new Notice('No home note configured. Set a path in Mobile Quick Widget settings.');
+          }
+        } catch {
+          new Notice('No home note configured. Set a path in Mobile Quick Widget settings.');
+        }
         break;
       }
 
       case 'new-note': {
-        const folder = this.settings.newNoteFolder;
-        const date = new Date().toLocaleDateString('en-CA');
-        let finalPath = folder ? `${folder}/Untitled ${date}.md` : `Untitled ${date}.md`;
-        let n = 1;
-        while (this.app.vault.getAbstractFileByPath(finalPath)) {
-          finalPath = folder
-            ? `${folder}/Untitled ${date} ${n}.md`
-            : `Untitled ${date} ${n}.md`;
-          n++;
-        }
-        const file = await this.app.vault.create(finalPath, '');
+        const file = await createNote(this.app, this.settings);
         await this.app.workspace.getMostRecentLeaf()?.openFile(file);
         break;
       }
 
       case 'command': {
         if (slice.commandId) {
-          (this.app as unknown as { commands: { executeCommandById: (id: string) => void } })
-            .commands.executeCommandById(slice.commandId);
+          this.app.commands.executeCommandById(slice.commandId);
         }
         break;
       }

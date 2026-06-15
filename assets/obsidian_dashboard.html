@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=380, initial-scale=1">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #141416;
+    --surface2: #1a1a1e;
+    --border: #242428;
+    --border-soft: #1e1e22;
+    --purple: #7c5cbf;
+    --purple-bright: #9b7ce8;
+    --purple-dim: #3d2d6b;
+    --purple-glow: rgba(124, 92, 191, 0.15);
+    --gold: #c9a84c;
+    --gold-dim: rgba(201, 168, 76, 0.12);
+    --text-primary: #e8e8ec;
+    --text-secondary: #6b6b78;
+    --text-muted: #3e3e48;
+    --green: #4caf7d;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  body {
+    background: #0a0a0c;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: var(--sans);
+    padding: 24px 0;
+  }
+
+  .phone-frame {
+    width: 375px;
+    height: 812px;
+    background: var(--bg);
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    box-shadow:
+      0 0 0 1px #2a2a30,
+      0 40px 80px rgba(0,0,0,0.7),
+      inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .notch {
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 34px;
+    background: #000;
+    border-radius: 0 0 18px 18px;
+    z-index: 100;
+  }
+
+  .status-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 44px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 28px 8px;
+    z-index: 99;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+  }
+  .status-bar .time { font-size: 13px; font-weight: 600; }
+  .status-icons { display: flex; gap: 5px; align-items: center; }
+
+  .app-base {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    padding-top: 44px;
+  }
+
+  .app-nav {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-soft);
+    gap: 10px;
+  }
+  .app-nav-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+  }
+  .app-icon-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .editor-area {
+    padding: 20px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .editor-h1 { font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; }
+  .editor-link { color: var(--purple-bright); }
+  .editor-tag { color: var(--gold); font-family: var(--mono); font-size: 12px; }
+
+  /* DASHBOARD */
+  .dashboard {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 680px;
+    background: linear-gradient(180deg, #0e0e12 0%, #0d0d10 85%, transparent 100%);
+    border-radius: 44px 44px 0 0;
+    z-index: 50;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dashboard::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 240px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--purple), transparent);
+    box-shadow: 0 0 20px 4px rgba(124,92,191,0.4);
+  }
+
+  .dash-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding-top: 56px;
+    padding-bottom: 24px;
+    scrollbar-width: none;
+  }
+  .dash-scroll::-webkit-scrollbar { display: none; }
+
+  .pull-handle {
+    position: absolute;
+    top: 18px; left: 50%; transform: translateX(-50%);
+    width: 36px; height: 4px;
+    background: #333338;
+    border-radius: 2px;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    padding: 0 20px;
+    margin-bottom: 10px;
+  }
+
+  .daily-pulse {
+    padding: 0 16px;
+    margin-bottom: 20px;
+  }
+
+  .pulse-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .pulse-card {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 12px 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pulse-card.today {
+    border-color: var(--purple-dim);
+    background: linear-gradient(135deg, #17142a 0%, var(--surface) 100%);
+  }
+
+  .pulse-card.today::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--purple), transparent);
+    opacity: 0.6;
+  }
+
+  .pulse-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    letter-spacing: 0.04em;
+  }
+
+  .pulse-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pulse-sub {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-top: 5px;
+  }
+
+  .pulse-accent { color: var(--purple-bright); }
+  .pulse-gold { color: var(--gold); }
+
+  .streak-pips {
+    display: flex;
+    gap: 3px;
+    margin-top: 6px;
+  }
+  .pip {
+    width: 14px; height: 3px;
+    border-radius: 2px;
+    background: var(--border);
+  }
+  .pip.on { background: var(--purple); }
+  .pip.today { background: var(--purple-bright); box-shadow: 0 0 4px var(--purple); }
+
+  .graph-section {
+    padding: 0 16px;
+    margin-bottom: 20px;
+  }
+
+  .graph-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .graph-canvas {
+    height: 120px;
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 50% 60%, rgba(124,92,191,0.06) 0%, transparent 70%);
+  }
+
+  .graph-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+  }
+
+  .graph-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .graph-stat {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .graph-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--purple);
+    box-shadow: 0 0 4px var(--purple);
+  }
+
+  .graph-open-btn {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--purple-bright);
+    letter-spacing: 0.04em;
+    opacity: 0.8;
+  }
+
+  .recents-section {
+    padding: 0 16px;
+    margin-bottom: 20px;
+  }
+
+  .note-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .note-row.modified::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--purple-bright);
+    border-radius: 2px 0 0 2px;
+  }
+
+  .note-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .note-meta { flex: 1; min-width: 0; }
+
+  .note-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+
+  .note-detail {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .note-links {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--purple-bright);
+    opacity: 0.7;
+  }
+
+  .note-time {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .tasks-section {
+    padding: 0 16px;
+    margin-bottom: 20px;
+  }
+
+  .task-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .task-row:last-child { border-bottom: none; }
+
+  .task-check {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    border: 1.5px solid var(--border);
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .task-check.done {
+    background: var(--purple-dim);
+    border-color: var(--purple);
+  }
+
+  .task-check.done::after {
+    content: '';
+    width: 8px; height: 5px;
+    border-left: 1.5px solid var(--purple-bright);
+    border-bottom: 1.5px solid var(--purple-bright);
+    transform: rotate(-45deg) translate(0px, -1px);
+    display: block;
+  }
+
+  .task-text {
+    font-size: 13px;
+    color: var(--text-primary);
+    flex: 1;
+  }
+
+  .task-text.done {
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--text-muted);
+  }
+
+  .task-src {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .task-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--gold-dim);
+    color: var(--gold);
+    font-family: var(--mono);
+  }
+
+  .quick-capture {
+    margin: 0 16px 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .capture-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--purple-glow);
+    border: 1px solid var(--purple-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .capture-placeholder {
+    font-size: 13px;
+    color: var(--text-muted);
+    flex: 1;
+  }
+
+  .capture-cmds {
+    display: flex;
+    gap: 6px;
+  }
+
+  .capture-cmd {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 3px 6px;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone-frame">
+  <div class="notch"></div>
+
+  <div class="status-bar">
+    <span class="time">9:41</span>
+    <div class="status-icons">
+      <svg width="15" height="11" viewBox="0 0 15 11" fill="white">
+        <rect x="0" y="4" width="3" height="7" rx="1" opacity="0.4"/>
+        <rect x="4" y="2.5" width="3" height="8.5" rx="1" opacity="0.6"/>
+        <rect x="8" y="1" width="3" height="10" rx="1" opacity="0.8"/>
+        <rect x="12" y="0" width="3" height="11" rx="1"/>
+      </svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="white">
+        <path d="M8 2.5C10.2 2.5 12.2 3.4 13.6 4.9L15 3.4C13.2 1.3 10.7 0 8 0C5.3 0 2.8 1.3 1 3.4L2.4 4.9C3.8 3.4 5.8 2.5 8 2.5Z" opacity="0.6"/>
+        <path d="M8 5.5C9.5 5.5 10.8 6.1 11.8 7.1L13.2 5.6C11.8 4.2 9.9 3.3 8 3.3C6.1 3.3 4.2 4.2 2.8 5.6L4.2 7.1C5.2 6.1 6.5 5.5 8 5.5Z" opacity="0.8"/>
+        <circle cx="8" cy="9.5" r="1.5"/>
+      </svg>
+      <svg width="25" height="11" viewBox="0 0 25 11" fill="none">
+        <rect x="0.5" y="0.5" width="21" height="10" rx="3.5" stroke="white" stroke-opacity="0.35"/>
+        <rect x="2" y="2" width="17" height="7" rx="2" fill="white"/>
+        <path d="M23 3.5V7.5C23.8 7.2 24.5 6.4 24.5 5.5C24.5 4.6 23.8 3.8 23 3.5Z" fill="white" opacity="0.4"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="app-base">
+    <div class="app-nav">
+      <div class="app-nav-title">Zettelkasten MOC</div>
+      <div class="app-icon-btn">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="#6b6b78">
+          <circle cx="5.5" cy="5.5" r="4" stroke="#6b6b78" stroke-width="1.5" fill="none"/>
+          <line x1="8.5" y1="8.5" x2="13" y2="13" stroke="#6b6b78" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="app-icon-btn">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="3" cy="7" r="1" fill="#6b6b78"/>
+          <circle cx="7" cy="7" r="1" fill="#6b6b78"/>
+          <circle cx="11" cy="7" r="1" fill="#6b6b78"/>
+        </svg>
+      </div>
+    </div>
+    <div class="editor-area">
+      <div class="editor-h1">Zettelkasten MOC</div>
+      <div>Maps of Content serve as entry points into clusters of thought. See <span class="editor-link">[[Literature Notes]]</span> and <span class="editor-link">[[Permanent Notes]]</span> for the underlying structure.</div>
+      <br>
+      <div><span class="editor-tag">#evergreen</span>&nbsp;<span class="editor-tag">#zettel</span></div>
+    </div>
+  </div>
+
+  <div class="dashboard">
+    <div class="pull-handle"></div>
+
+    <div class="dash-scroll">
+
+      <div class="quick-capture">
+        <div class="capture-icon">✦</div>
+        <div class="capture-placeholder">Capture a thought...</div>
+        <div class="capture-cmds">
+          <div class="capture-cmd">🎙</div>
+          <div class="capture-cmd">📷</div>
+        </div>
+      </div>
+
+      <div style="height:14px"></div>
+
+      <div class="section-label">TODAY &middot; MON 15 JUN</div>
+      <div class="daily-pulse">
+        <div class="pulse-row">
+          <div class="pulse-card today">
+            <div class="pulse-label">Daily note</div>
+            <div class="pulse-value pulse-accent">Open</div>
+            <div class="pulse-sub">3 tasks &middot; 1 meeting</div>
+          </div>
+          <div class="pulse-card">
+            <div class="pulse-label">Words today</div>
+            <div class="pulse-value">847</div>
+            <div class="streak-pips">
+              <div class="pip on"></div>
+              <div class="pip on"></div>
+              <div class="pip on"></div>
+              <div class="pip on"></div>
+              <div class="pip on"></div>
+              <div class="pip on"></div>
+              <div class="pip today"></div>
+            </div>
+            <div class="pulse-sub" style="margin-top:4px">7-day streak</div>
+          </div>
+          <div class="pulse-card">
+            <div class="pulse-label">Vault</div>
+            <div class="pulse-value pulse-gold">2.4k</div>
+            <div class="pulse-sub">notes &middot; 18.3k links</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">ACTIVE CLUSTER</div>
+      <div class="graph-section">
+        <div class="graph-card">
+          <div class="graph-canvas">
+            <svg class="graph-svg" viewBox="0 0 343 120" xmlns="http://www.w3.org/2000/svg">
+              <g stroke="#2e2e3a" stroke-width="1" opacity="0.8">
+                <line x1="171" y1="60" x2="120" y2="40"/>
+                <line x1="171" y1="60" x2="210" y2="35"/>
+                <line x1="171" y1="60" x2="230" y2="72"/>
+                <line x1="171" y1="60" x2="195" y2="90"/>
+                <line x1="171" y1="60" x2="140" y2="85"/>
+                <line x1="171" y1="60" x2="108" y2="70"/>
+                <line x1="120" y1="40" x2="85" y2="25"/>
+                <line x1="120" y1="40" x2="90" y2="55"/>
+                <line x1="210" y1="35" x2="250" y2="18"/>
+                <line x1="210" y1="35" x2="240" y2="50"/>
+                <line x1="230" y1="72" x2="268" y2="65"/>
+                <line x1="230" y1="72" x2="255" y2="88"/>
+                <line x1="195" y1="90" x2="215" y2="108"/>
+                <line x1="140" y1="85" x2="115" y2="100"/>
+                <line x1="108" y1="70" x2="75" y2="82"/>
+                <line x1="85" y1="25" x2="60" y2="18"/>
+                <line x1="90" y1="55" x2="65" y2="65"/>
+                <line x1="250" y1="18" x2="275" y2="10"/>
+                <line x1="268" y1="65" x2="295" y2="60"/>
+              </g>
+              <g stroke="#7c5cbf" stroke-width="1.5" opacity="0.5">
+                <line x1="171" y1="60" x2="120" y2="40"/>
+                <line x1="171" y1="60" x2="140" y2="85"/>
+                <line x1="120" y1="40" x2="90" y2="55"/>
+              </g>
+              <g fill="#1e1e28" stroke="#2e2e3a" stroke-width="1">
+                <circle cx="85" cy="25" r="4"/>
+                <circle cx="60" cy="18" r="3"/>
+                <circle cx="90" cy="55" r="5"/>
+                <circle cx="65" cy="65" r="3"/>
+                <circle cx="75" cy="82" r="4"/>
+                <circle cx="115" cy="100" r="4"/>
+                <circle cx="215" cy="108" r="3"/>
+                <circle cx="250" cy="18" r="4"/>
+                <circle cx="275" cy="10" r="3"/>
+                <circle cx="240" cy="50" r="5"/>
+                <circle cx="268" cy="65" r="4"/>
+                <circle cx="295" cy="60" r="3"/>
+                <circle cx="255" cy="88" r="4"/>
+              </g>
+              <g fill="#252535" stroke="#3a3a50" stroke-width="1">
+                <circle cx="108" cy="70" r="6"/>
+                <circle cx="195" cy="90" r="6"/>
+                <circle cx="140" cy="85" r="7"/>
+              </g>
+              <g fill="#2e2248" stroke="#7c5cbf" stroke-width="1.5">
+                <circle cx="120" cy="40" r="8"/>
+                <circle cx="210" cy="35" r="8"/>
+                <circle cx="230" cy="72" r="7"/>
+              </g>
+              <text x="120" y="28" text-anchor="middle" fill="#9b7ce8" font-size="7" font-family="monospace" opacity="0.9">[[PKM]]</text>
+              <text x="218" y="24" text-anchor="middle" fill="#9b7ce8" font-size="7" font-family="monospace" opacity="0.9">[[Spaced Rep.]]</text>
+              <text x="248" y="78" text-anchor="middle" fill="#9b7ce8" font-size="7" font-family="monospace" opacity="0.9">[[Writing]]</text>
+              <circle cx="171" cy="60" r="16" fill="none" stroke="#7c5cbf" stroke-width="1" opacity="0.2"/>
+              <circle cx="171" cy="60" r="13" fill="#1a1230" stroke="#9b7ce8" stroke-width="2"/>
+              <circle cx="171" cy="60" r="7" fill="#7c5cbf"/>
+              <circle cx="171" cy="60" r="3" fill="#d4b8ff"/>
+              <text x="171" y="83" text-anchor="middle" fill="#e8e8ec" font-size="8" font-family="sans-serif" font-weight="500">Zettelkasten MOC</text>
+            </svg>
+          </div>
+          <div class="graph-footer">
+            <div class="graph-stat">
+              <div class="graph-dot"></div>
+              <span>24 connected notes</span>
+            </div>
+            <div class="graph-open-btn">FULL GRAPH &rarr;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">RECENTLY TOUCHED</div>
+      <div class="recents-section">
+        <div class="note-row modified">
+          <div class="note-icon">📝</div>
+          <div class="note-meta">
+            <div class="note-title">The forgetting curve and spaced rep.</div>
+            <div class="note-detail">
+              <span class="note-links">&larr; 7 links</span>
+              <span>#learning</span>
+            </div>
+          </div>
+          <div class="note-time">2m ago</div>
+        </div>
+        <div class="note-row">
+          <div class="note-icon">🗂</div>
+          <div class="note-meta">
+            <div class="note-title">PKM system overview</div>
+            <div class="note-detail">
+              <span class="note-links">&larr; 31 links</span>
+              <span>#moc</span>
+            </div>
+          </div>
+          <div class="note-time">1h ago</div>
+        </div>
+        <div class="note-row">
+          <div class="note-icon">💡</div>
+          <div class="note-meta">
+            <div class="note-title">Writing as thinking, not reporting</div>
+            <div class="note-detail">
+              <span class="note-links">&larr; 4 links</span>
+              <span>#evergreen</span>
+            </div>
+          </div>
+          <div class="note-time">Yesterday</div>
+        </div>
+        <div class="note-row">
+          <div class="note-icon">📅</div>
+          <div class="note-meta">
+            <div class="note-title">2026-06-14 Sunday</div>
+            <div class="note-detail">
+              <span class="note-links">&larr; 3 links</span>
+              <span>#journal</span>
+            </div>
+          </div>
+          <div class="note-time">Yesterday</div>
+        </div>
+      </div>
+
+      <div class="section-label">TASKS &middot; TODAY</div>
+      <div class="tasks-section">
+        <div class="task-card">
+          <div class="task-row">
+            <div class="task-check done"></div>
+            <div class="task-text done">Review anki deck</div>
+            <div class="task-src">Daily</div>
+          </div>
+          <div class="task-row">
+            <div class="task-check"></div>
+            <div class="task-text">Finish Feynman technique note</div>
+            <div class="task-tag">#learning</div>
+          </div>
+          <div class="task-row">
+            <div class="task-check"></div>
+            <div class="task-text">Link [[Writing MOC]] to Zettelkasten</div>
+            <div class="task-src">Inbox</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height: 20px"></div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
