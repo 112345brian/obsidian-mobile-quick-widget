@@ -3,7 +3,7 @@ import type { ReadonlyDeep } from 'type-fest';
 
 import { Modal, Notice, setIcon } from 'obsidian';
 
-import type { PluginSettings, QuickAction } from '../PluginSettings.ts';
+import type { PulseCard, PluginSettings, QuickAction } from '../PluginSettings.ts';
 
 import { createNote } from '../createNote.ts';
 import { AppendPromptModal } from './AppendPromptModal.ts';
@@ -11,7 +11,8 @@ import { AppendPromptModal } from './AppendPromptModal.ts';
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
 function headerDate(): string {
-  return new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
+  return new Date()
+    .toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
     .toUpperCase();
 }
 
@@ -27,38 +28,33 @@ function fromNow(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function extractPreview(raw: string): string {
+function stripMarkdown(raw: string): string[] {
   const body = raw.startsWith('---') ? raw.replace(/^---[\s\S]*?---\n?/, '') : raw;
-  const text = body
+  return body
     .replace(/```[\s\S]*?```/g, '')
     .replace(/%%[\s\S]*?%%/g, '')
     .replace(/!\[\[.*?\]\]/g, '')
     .replace(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, '$1')
     .replace(/!\[.*?\]\(.*?\)/g, '')
     .replace(/\[([^\]]+)\]\(.*?\)/g, '$1')
-    .replace(/^#{1,6}\s+.*/gm, '')
+    .replace(/^#{1,6}\s+/gm, '')           // strip # markers but keep heading text
     .replace(/^\s*\|.*\|\s*$/gm, '')
     .replace(/\*{1,3}([^*\n]+)\*{1,3}/g, '$1')
+    .replace(/_([^_\n]+)_/g, '$1')
     .replace(/^>\s?/gm, '')
     .replace(/^[-*+]\s+/gm, '')
     .replace(/^\d+\.\s+/gm, '')
     .replace(/`[^`\n]*`/g, '')
-    .split('\n').map((l) => l.trim()).filter((l) => l.length > 2)
-    .join(' ').replace(/\s{2,}/g, ' ').trim();
-  return text.slice(0, 120);
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
 }
 
-function noteIcon(file: TFile, app: App): string {
-  const cache = app.metadataCache.getFileCache(file);
-  const tags = (cache?.tags ?? []).map((t) => t.tag.toLowerCase());
-  const fm = (cache?.frontmatter?.['tags'] ?? []) as string[];
-  const all = [...tags, ...fm.map((t) => `#${t}`.toLowerCase())];
-  if (all.some((t) => t.includes('journal') || t.includes('daily'))) return 'calendar';
-  if (all.some((t) => t.includes('task') || t.includes('todo'))) return 'check-square';
-  if (all.some((t) => t.includes('moc') || t.includes('index'))) return 'layers';
-  if (all.some((t) => t.includes('person') || t.includes('contact'))) return 'user';
-  return 'file-text';
+function extractTailPreview(raw: string): string {
+  const lines = stripMarkdown(raw);
+  return lines.slice(-3).join('  ·  ').replace(/\s{2,}/g, ' ').trim().slice(0, 140);
 }
+
 
 function noteTags(file: TFile, app: App): string[] {
   const cache = app.metadataCache.getFileCache(file);
@@ -114,18 +110,16 @@ export class DashboardModal extends Modal {
     modalEl.createEl('div', { cls: 'qw-dash-handle' });
 
     const widgets = this.settings.dashboardWidgets ?? [];
-    const trashEnabled = widgets.some((w) => w.type === 'trash' && w.enabled);
-    const trashApi = trashEnabled ? getTrashApi(this.app) : null;
-    const trashCount = trashApi ? trashApi.getCandidates().length : 0;
 
     this.renderCapture(contentEl);
-    this.renderDateHeader(contentEl, trashCount > 0 ? { count: trashCount, api: trashApi! } : null);
+    this.renderTodaySection(contentEl);
 
     for (const widget of widgets) {
       if (!widget.enabled) continue;
       switch (widget.type) {
         case 'continue': await this.renderContinue(contentEl); break;
-        case 'new-note': this.renderQuickActions(contentEl); break;
+        case 'graph': this.renderGraph(contentEl); break;
+        case 'new-note': this.renderMoreActions(contentEl); break;
       }
     }
   }
@@ -138,13 +132,18 @@ export class DashboardModal extends Modal {
 
   private renderCapture(root: HTMLElement): void {
     const appendAction = (this.settings.quickActions ?? []).find((a) => a.action === 'append-to-note');
+
     const bar = root.createEl('div', { cls: 'qw-dash-capture' });
-    const icon = bar.createEl('div', { cls: 'qw-dash-capture-icon' });
-    setIcon(icon, 'pencil');
-    bar.createEl('span', {
+
+    bar.createEl('div', { cls: 'qw-dash-capture-icon', text: '✦' });
+
+    bar.createEl('div', {
       cls: 'qw-dash-capture-placeholder',
-      text: appendAction ? `Add to ${this.app.vault.getFileByPath(appendAction.notePath ?? '')?.basename ?? 'note'}…` : 'New note…',
+      text: appendAction
+        ? `Add to ${this.app.vault.getFileByPath(appendAction.notePath ?? '')?.basename ?? 'note'}…`
+        : 'Capture a thought…',
     });
+
     bar.addEventListener('click', () => {
       if (appendAction) {
         void this.handleQuickAction(appendAction);
@@ -154,15 +153,96 @@ export class DashboardModal extends Modal {
     });
   }
 
-  private renderDateHeader(root: HTMLElement, trash: { count: number; api: TrashApi } | null): void {
-    const row = root.createEl('div', { cls: 'qw-dash-date-row' });
-    row.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
-    if (trash) {
-      const badge = row.createEl('button', { cls: 'qw-dash-trash-badge' });
-      const iconWrap = badge.createEl('span', { cls: 'qw-dash-trash-icon' });
-      setIcon(iconWrap, 'trash-2');
-      badge.createEl('span', { cls: 'qw-dash-trash-count', text: String(trash.count) });
-      badge.addEventListener('click', () => { this.close(); void trash.api.openTriage(); });
+  private renderTodaySection(root: HTMLElement): void {
+    const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
+    dateRow.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
+
+    const cards = (this.settings.pulseCards ?? []).filter((c) => c.enabled);
+    if (cards.length === 0) return;
+
+    // Resolve trash data once (needed for trash cards)
+    const needsTrash = cards.some((c) => c.type === 'trash');
+    const trashApi = needsTrash ? getTrashApi(this.app) : null;
+    const trashCount = trashApi ? trashApi.getCandidates().length : 0;
+
+    // Pre-compute shared vault stats once
+    const allFiles = this.app.vault.getMarkdownFiles();
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+
+    const visibleCards = cards.filter((c) => {
+      if (c.type === 'trash') return trashCount > 0;
+      return true;
+    });
+
+    if (visibleCards.length === 0) return;
+
+    const pulseRow = root.createEl('div', { cls: 'qw-dash-pulse-row' });
+
+    for (const card of visibleCards) {
+      this.renderPulseCard(pulseRow, card, { allFiles, today, trashApi, trashCount });
+    }
+  }
+
+  private renderPulseCard(
+    row: HTMLElement,
+    card: PulseCard,
+    ctx: { allFiles: TFile[]; today: Date; trashApi: TrashApi | null; trashCount: number },
+  ): void {
+    switch (card.type) {
+      case 'daily-note': {
+        const el = row.createEl('div', { cls: 'qw-dash-pulse-card qw-dash-pulse-card--accent' });
+        el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Daily note' });
+        el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--accent', text: 'Open' });
+        el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'Jump to today' });
+        el.addEventListener('click', () => {
+          this.close();
+          try {
+            const id = this.app.commands.findCommand('daily-notes:goto-today')
+              ? 'daily-notes:goto-today'
+              : 'periodic-notes:open-daily-note';
+            this.app.commands.executeCommandById(id);
+          } catch { /* plugin not installed */ }
+        });
+        break;
+      }
+      case 'modified-today': {
+        const count = ctx.allFiles.filter((f) => f.stat.mtime >= ctx.today.getTime()).length;
+        const el = row.createEl('div', { cls: 'qw-dash-pulse-card' });
+        el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Modified' });
+        el.createEl('div', { cls: 'qw-dash-pulse-value', text: String(count) });
+        el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'notes today' });
+        break;
+      }
+      case 'vault': {
+        const noteCount = ctx.allFiles.length;
+        const noteStr = noteCount >= 1000 ? `${(noteCount / 1000).toFixed(1)}k` : String(noteCount);
+        let linkCount = 0;
+        for (const f of ctx.allFiles) linkCount += this.app.metadataCache.getFileCache(f)?.links?.length ?? 0;
+        const linkStr = linkCount >= 1000 ? `${(linkCount / 1000).toFixed(1)}k` : String(linkCount);
+        const el = row.createEl('div', { cls: 'qw-dash-pulse-card' });
+        el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Vault' });
+        el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--gold', text: noteStr });
+        el.createEl('div', { cls: 'qw-dash-pulse-sub', text: `notes · ${linkStr} links` });
+        break;
+      }
+      case 'trash': {
+        const el = row.createEl('div', { cls: 'qw-dash-pulse-card' });
+        el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Needs review' });
+        el.createEl('div', { cls: 'qw-dash-pulse-value', text: String(ctx.trashCount) });
+        el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'stale notes' });
+        el.addEventListener('click', () => { this.close(); void ctx.trashApi?.openTriage(); });
+        break;
+      }
+      case 'quick-action': {
+        const action = card.quickAction;
+        if (!action) break;
+        const el = row.createEl('div', { cls: 'qw-dash-pulse-card' });
+        const iconWrap = el.createEl('div', { cls: 'qw-dash-pulse-action-icon' });
+        setIcon(iconWrap, action.icon || 'zap');
+        el.createEl('div', { cls: 'qw-dash-pulse-label', text: action.label });
+        el.addEventListener('click', () => { void this.handleQuickAction(action); });
+        break;
+      }
     }
   }
 
@@ -173,40 +253,145 @@ export class DashboardModal extends Modal {
     root.createEl('div', { cls: 'qw-dash-section-label', text: 'RECENTLY TOUCHED' });
 
     for (const [idx, file] of files.entries()) {
-      const row = root.createEl('div', { cls: idx === 0 ? 'qw-dash-note-row qw-dash-note-row--recent' : 'qw-dash-note-row' });
-
-      const iconWrap = row.createEl('div', { cls: 'qw-dash-note-icon' });
-      setIcon(iconWrap, noteIcon(file, this.app));
+      const row = root.createEl('div', {
+        cls: idx === 0 ? 'qw-dash-note-row qw-dash-note-row--recent' : 'qw-dash-note-row',
+      });
 
       const meta = row.createEl('div', { cls: 'qw-dash-note-meta' });
-      meta.createEl('div', { cls: 'qw-dash-note-title', text: file.basename });
 
+      const titleRow = meta.createEl('div', { cls: 'qw-dash-note-title-row' });
+      titleRow.createEl('span', { cls: 'qw-dash-note-title', text: file.basename });
+      titleRow.createEl('span', { cls: 'qw-dash-note-time', text: fromNow(file.stat.mtime) });
+
+      // Tags + backlink count
       const tags = noteTags(file, this.app);
-      if (tags.length > 0) {
-        const detail = meta.createEl('div', { cls: 'qw-dash-note-detail' });
-        for (const tag of tags) {
-          detail.createEl('span', { cls: 'qw-dash-note-tag', text: tag });
-        }
+      let backlinkCount = 0;
+      for (const links of Object.values(this.app.metadataCache.resolvedLinks)) {
+        if (links[file.path]) backlinkCount++;
       }
+      const detail = meta.createEl('div', { cls: 'qw-dash-note-detail' });
+      if (backlinkCount > 0) detail.createEl('span', { cls: 'qw-dash-note-links', text: `← ${backlinkCount}` });
+      for (const tag of tags) detail.createEl('span', { cls: 'qw-dash-note-tag', text: tag });
 
+      // Always show tail preview
       try {
-        const raw = await this.app.vault.cachedRead(file);
-        const preview = extractPreview(raw);
-        if (preview && tags.length === 0) {
-          meta.createEl('div', { cls: 'qw-dash-note-preview', text: preview });
-        }
+        const preview = extractTailPreview(await this.app.vault.cachedRead(file));
+        if (preview) meta.createEl('div', { cls: 'qw-dash-note-preview', text: preview });
       } catch { /* skip */ }
-
-      row.createEl('div', { cls: 'qw-dash-note-time', text: fromNow(file.stat.mtime) });
-      row.addEventListener('click', () => { this.close(); void this.app.workspace.getMostRecentLeaf()?.openFile(file); });
+      row.addEventListener('click', () => {
+        this.close();
+        void this.app.workspace.getMostRecentLeaf()?.openFile(file);
+      });
     }
   }
 
-  private renderQuickActions(root: HTMLElement): void {
+  private renderGraph(root: HTMLElement): void {
+    const centerFile = this.getRecentFiles()[0];
+    if (!centerFile) return;
+
+    const resolvedLinks = this.app.metadataCache.resolvedLinks;
+    const outgoing = Object.keys(resolvedLinks[centerFile.path] ?? {});
+    const incoming: string[] = [];
+    for (const [src, links] of Object.entries(resolvedLinks)) {
+      if (src !== centerFile.path && links[centerFile.path]) incoming.push(src);
+    }
+    const neighborPaths = [...new Set([...outgoing, ...incoming])];
+    const totalConnections = neighborPaths.length;
+
+    root.createEl('div', { cls: 'qw-dash-section-label', text: 'ACTIVE CLUSTER' });
+
+    const card = root.createEl('div', { cls: 'qw-dash-graph-card' });
+    const canvas = card.createEl('div', { cls: 'qw-dash-graph-canvas' });
+    const attachListeners = (expanded: boolean): void => {
+      canvas.innerHTML = this.buildGraphSvg(centerFile, neighborPaths.slice(0, expanded ? 20 : 10), expanded);
+
+      canvas.querySelectorAll<SVGElement>('[data-path]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const file = this.app.vault.getFileByPath(el.getAttribute('data-path') ?? '');
+          if (file) { this.close(); void this.app.workspace.getMostRecentLeaf()?.openFile(file); }
+        });
+      });
+
+      canvas.querySelector<SVGElement>('[data-center]')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.close();
+        void this.app.workspace.getMostRecentLeaf()?.openFile(centerFile);
+      });
+
+      canvas.addEventListener('click', () => {
+        const expanded2 = card.classList.toggle('qw-dash-graph-card--expanded');
+        attachListeners(expanded2);
+      }, { once: true });
+    };
+
+    attachListeners(false);
+
+    const footer = card.createEl('div', { cls: 'qw-dash-graph-footer' });
+    const stat = footer.createEl('div', { cls: 'qw-dash-graph-stat' });
+    stat.createEl('div', { cls: 'qw-dash-graph-dot' });
+    stat.createEl('span', { text: `${totalConnections} connected notes` });
+
+    const btn = footer.createEl('button', { cls: 'qw-dash-graph-btn', text: 'FULL GRAPH →' });
+    btn.addEventListener('click', () => {
+      this.close();
+      try { this.app.commands.executeCommandById('graph:open'); } catch { /* */ }
+    });
+  }
+
+  private buildGraphSvg(center: TFile, neighborPaths: string[], expanded = false): string {
+    const cx = 171;
+    const viewH = expanded ? 356 : 178;
+    const cy = viewH / 2;  // always vertically centered in the viewBox
+    const r = expanded ? 115 : 58;
+    const n = neighborPaths.length;
+
+    const neighbors = neighborPaths.map((path, i) => {
+      const angle = (i / Math.max(n, 1)) * 2 * Math.PI - Math.PI / 2;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      const name = this.app.vault.getFileByPath(path)?.basename ?? path.split('/').pop()?.replace(/\.md$/, '') ?? '';
+      return { x, y, name, path };
+    });
+
+    const edges = neighbors
+      .map((nb) => `<line x1="${cx}" y1="${cy}" x2="${nb.x.toFixed(1)}" y2="${nb.y.toFixed(1)}" stroke="#2e2e3a" stroke-width="1" opacity="0.8"/>`)
+      .join('');
+
+    const nodes = neighbors
+      .map((nb) => {
+        const truncated = nb.name.length > 14 ? nb.name.slice(0, 14) + '…' : nb.name;
+        const above = nb.y < cy;
+        const ly = above ? nb.y - 10 : nb.y + 14;
+        return `<g data-path="${nb.path}" style="cursor:pointer">
+          <circle cx="${nb.x.toFixed(1)}" cy="${nb.y.toFixed(1)}" r="14" fill="transparent"/>
+          <circle cx="${nb.x.toFixed(1)}" cy="${nb.y.toFixed(1)}" r="4" fill="#1e1e28" stroke="#3a3a50" stroke-width="1"/>
+          <text x="${nb.x.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" fill="#9b7ce8" font-size="7" font-family="monospace" opacity="0.85">[[${truncated}]]</text>
+        </g>`;
+      })
+      .join('');
+
+    const centerLabel = center.basename.length > 20 ? center.basename.slice(0, 20) + '…' : center.basename;
+
+    return `<svg viewBox="0 0 343 ${viewH}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+      <g>${edges}</g>
+      <g>${nodes}</g>
+      <g data-center style="cursor:pointer">
+        <circle cx="${cx}" cy="${cy}" r="22" fill="transparent"/>
+        <circle cx="${cx}" cy="${cy}" r="16" fill="none" stroke="#7c5cbf" stroke-width="1" opacity="0.2"/>
+        <circle cx="${cx}" cy="${cy}" r="13" fill="#1a1230" stroke="#9b7ce8" stroke-width="2"/>
+        <circle cx="${cx}" cy="${cy}" r="7" fill="#7c5cbf"/>
+        <circle cx="${cx}" cy="${cy}" r="3" fill="#d4b8ff"/>
+        <text x="${cx}" y="${cy + 26}" text-anchor="middle" fill="#e8e8ec" font-size="8" font-family="sans-serif" font-weight="500">${centerLabel}</text>
+      </g>
+    </svg>`;
+  }
+
+  private renderMoreActions(root: HTMLElement): void {
     const actions = this.settings.quickActions ?? [];
     if (actions.length === 0) return;
 
-    root.createEl('div', { cls: 'qw-dash-section-label', text: 'QUICK ACTIONS' });
+    root.createEl('div', { cls: 'qw-dash-section-label', text: 'MORE ACTIONS' });
     const row = root.createEl('div', { cls: 'qw-dash-actions' });
 
     for (const action of actions) {
@@ -222,16 +407,17 @@ export class DashboardModal extends Modal {
 
   private isExcluded(file: TFile): boolean {
     return (this.settings.continueExcluded ?? []).some((rule) =>
-      rule.endsWith('/') ? file.path.startsWith(rule) : file.path === rule
+      rule.endsWith('/') ? file.path.startsWith(rule) : file.path === rule,
     );
   }
 
   private getRecentFiles(): TFile[] {
     const MAX = 4;
     const continuePlug = getContinuePlugin(this.app);
-    const paths = continuePlug && continuePlug.openedLog.length > 0
-      ? continuePlug.openedLog
-      : this.app.workspace.getLastOpenFiles();
+    const paths =
+      continuePlug && continuePlug.openedLog.length > 0
+        ? continuePlug.openedLog
+        : this.app.workspace.getLastOpenFiles();
     return paths
       .map((p) => this.app.vault.getFileByPath(p))
       .filter((f): f is TFile => f !== null && !this.isExcluded(f))

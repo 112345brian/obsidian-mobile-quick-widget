@@ -26,7 +26,7 @@ export const QUICK_ACTION_DEFAULTS: QuickAction[] = [
   { label: 'Home', icon: 'home', action: 'homepage' },
 ];
 
-export type DashboardWidgetType = 'continue' | 'new-note' | 'trash';
+export type DashboardWidgetType = 'continue' | 'new-note' | 'trash' | 'graph';
 
 export interface DashboardWidget {
   type: DashboardWidgetType;
@@ -47,9 +47,10 @@ export const DASHBOARD_PRESETS: Record<DashboardPreset, { label: string; widgets
   full: {
     label: 'Full',
     widgets: [
+      { type: 'graph', enabled: true },
       { type: 'continue', enabled: true },
       { type: 'trash', enabled: true },
-      { type: 'new-note', enabled: true },
+      { type: 'new-note', enabled: false },
     ],
   },
   triage: {
@@ -63,12 +64,35 @@ export const DASHBOARD_PRESETS: Record<DashboardPreset, { label: string; widgets
 };
 
 export const WIDGET_LABELS: Record<DashboardWidgetType, string> = {
-  continue: 'Continue',
+  continue: 'Recently Touched',
+  graph: 'Active Cluster (graph)',
   trash: 'Needs Review',
-  'new-note': 'Quick Actions',
+  'new-note': 'More Actions',
 };
 
 export type NewNoteFilenameFormat = 'untitled' | 'zettelkasten';
+
+export type PulseCardType = 'daily-note' | 'modified-today' | 'vault' | 'trash' | 'quick-action';
+
+export interface PulseCard {
+  type: PulseCardType;
+  enabled: boolean;
+  quickAction?: QuickAction; // only for type === 'quick-action'
+}
+
+export const PULSE_CARD_LABELS: Record<PulseCardType, string> = {
+  'daily-note': 'Daily Note',
+  'modified-today': 'Modified Today',
+  'vault': 'Vault Stats',
+  'trash': 'Trash (conditional)',
+  'quick-action': 'Quick Action',
+};
+
+export const DEFAULT_PULSE_CARDS: PulseCard[] = [
+  { type: 'daily-note', enabled: true },
+  { type: 'modified-today', enabled: true },
+  { type: 'vault', enabled: true },
+];
 
 export class PluginSettings {
   public homePath = '';
@@ -77,6 +101,7 @@ export class PluginSettings {
   public continueExcluded: string[] = [];
   public quickActions: QuickAction[] = QUICK_ACTION_DEFAULTS.map((a) => ({ ...a }));
   public newNoteFilenameFormat: NewNoteFilenameFormat = 'untitled';
+  public pulseCards: PulseCard[] = DEFAULT_PULSE_CARDS.map((c) => ({ ...c }));
   public slices: SliceConfig[] = [
     { label: 'Cancel', icon: '✕', action: 'cancel', color: '#666666', startAngle: 0, endAngle: 180 },
     { label: 'Home', icon: '⌂', action: 'homepage', color: '#3b82f6', startAngle: 180, endAngle: 270 },

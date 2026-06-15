@@ -1,11 +1,11 @@
 import { Notice, Setting } from 'obsidian';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab-base';
 
-import type { DashboardWidget, NewNoteFilenameFormat, QuickAction, SliceConfig } from './PluginSettings.ts';
+import type { DashboardWidget, NewNoteFilenameFormat, PulseCard, QuickAction, SliceConfig } from './PluginSettings.ts';
 import type { PluginTypes } from './PluginTypes.ts';
 
 import { CommandPickerModal } from './Modals/CommandPickerModal.ts';
-import { DASHBOARD_PRESETS, QUICK_ACTION_DEFAULTS, WIDGET_LABELS, PluginSettings } from './PluginSettings.ts';
+import { DASHBOARD_PRESETS, DEFAULT_PULSE_CARDS, PULSE_CARD_LABELS, QUICK_ACTION_DEFAULTS, WIDGET_LABELS, PluginSettings } from './PluginSettings.ts';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   public override display(): void {
@@ -82,6 +82,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
 
     this.renderDashboardSection(s);
+    this.renderPulseCardsSection(s);
     this.renderQuickActionsSection(s);
 
     this.containerEl.createEl('h3', { text: 'Slices' });
@@ -263,6 +264,76 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           });
         });
     }
+  }
+
+  private renderPulseCardsSection(s: PluginSettings): void {
+    this.containerEl.createEl('h3', { text: 'Pulse Cards' });
+    this.containerEl.createEl('p', {
+      cls: 'setting-item-description',
+      text: 'Cards shown below the date header. Trash only appears when there are stale notes. Quick Action cards use any action from your Quick Actions list.',
+    });
+
+    const cards = s.pulseCards as PulseCard[];
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      if (!card) continue;
+      const save = (): void => { void this.plugin.settingsManager.saveToFile(); };
+
+      const setting = new Setting(this.containerEl)
+        .setName(card.type === 'quick-action' && card.quickAction ? card.quickAction.label : PULSE_CARD_LABELS[card.type])
+        .addToggle((t) => { t.setValue(card.enabled).onChange((v) => { card.enabled = v; save(); }); })
+        .addExtraButton((btn) => {
+          btn.setIcon('arrow-up').setTooltip('Move up').onClick(() => {
+            if (i === 0) return;
+            [cards[i - 1], cards[i]] = [cards[i]!, cards[i - 1]!];
+            save(); this.display();
+          });
+        })
+        .addExtraButton((btn) => {
+          btn.setIcon('arrow-down').setTooltip('Move down').onClick(() => {
+            if (i === cards.length - 1) return;
+            [cards[i + 1], cards[i]] = [cards[i]!, cards[i + 1]!];
+            save(); this.display();
+          });
+        })
+        .addButton((btn) => {
+          btn.setButtonText('Remove').setWarning().onClick(() => {
+            cards.splice(i, 1); save(); this.display();
+          });
+        });
+
+      if (card.type === 'quick-action') {
+        const action = card.quickAction;
+        setting.setDesc(action ? `${action.action}${action.commandId ? ` · ${action.commandId}` : ''}` : 'Not configured');
+      }
+    }
+
+    new Setting(this.containerEl)
+      .addDropdown((dd) => {
+        dd
+          .addOption('daily-note', PULSE_CARD_LABELS['daily-note'])
+          .addOption('modified-today', PULSE_CARD_LABELS['modified-today'])
+          .addOption('vault', PULSE_CARD_LABELS['vault'])
+          .addOption('trash', PULSE_CARD_LABELS['trash'])
+          .addOption('quick-action', PULSE_CARD_LABELS['quick-action']);
+        dd.onChange((val) => {
+          const type = val as PulseCard['type'];
+          if (type === 'quick-action') {
+            cards.push({ type, enabled: true, quickAction: { label: 'Action', icon: 'zap', action: 'new-note' } });
+          } else {
+            cards.push({ type, enabled: true });
+          }
+          void this.plugin.settingsManager.saveToFile(); this.display();
+        });
+        dd.setValue('daily-note');
+      })
+      .addButton((btn) => {
+        btn.setButtonText('Reset').onClick(() => {
+          s.pulseCards = DEFAULT_PULSE_CARDS.map((c) => ({ ...c }));
+          void this.plugin.settingsManager.saveToFile(); this.display();
+        });
+      });
   }
 
   private renderQuickActionsSection(s: PluginSettings): void {
