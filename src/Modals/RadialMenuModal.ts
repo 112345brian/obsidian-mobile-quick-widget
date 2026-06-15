@@ -51,8 +51,14 @@ export class RadialMenuModal extends Modal {
   public override onOpen(): void {
     const { modalEl, contentEl } = this;
     modalEl.addClass('qw-modal');
-    modalEl.querySelector('.modal-close-button')?.remove();
     contentEl.addClass('qw-content');
+
+    // Remove the close button — deferred because Obsidian may append it after onOpen()
+    setTimeout(() => {
+      for (const el of modalEl.querySelectorAll<HTMLElement>('.modal-close-button')) {
+        el.remove();
+      }
+    }, 0);
 
     // Darken the note content behind the overlay
     const bg = this.containerEl.querySelector<HTMLElement>('.modal-bg');
