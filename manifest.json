@@ -1,0 +1,11 @@
+{
+  "author": "112345brian",
+  "authorUrl": "https://github.com/112345brian/",
+  "description": "Radial pie menu for Obsidian mobile — assign to swipe-up and tap a slice to run a command.",
+
+  "id": "mobile-quick-widget",
+  "isDesktopOnly": false,
+  "minAppVersion": "1.13.0",
+  "name": "Mobile Quick Widget",
+  "version": "0.1.0"
+}
