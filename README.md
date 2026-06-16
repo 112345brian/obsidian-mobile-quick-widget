@@ -1,9 +1,9 @@
-# Mobile Quick Widget
+# ReadyBoard
 
 [![GitHub release](https://img.shields.io/github/v/release/112345brian/obsidian-mobile-quick-widget)](https://github.com/112345brian/obsidian-mobile-quick-widget/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/112345brian/obsidian-mobile-quick-widget/total)](https://github.com/112345brian/obsidian-mobile-quick-widget/releases)
 
-A radial menu and dashboard for Obsidian mobile. Assign the radial menu to a swipe gesture, navigate your note's breadcrumbs, run commands, or jump to recent notes with one thumb.
+A radial menu and dashboard for Obsidian. Assign the radial menu to a swipe gesture, navigate your note's breadcrumbs, run commands, or jump to recent notes with one thumb — or open the dashboard as a persistent sidebar panel instead.
 
 ---
 
@@ -31,6 +31,12 @@ Three modes on a single ring, switched by tapping the center node or the mode-ke
 
 ### Dashboard
 A bottom-sheet modal with modular widgets:
+
+**Radial Launcher**
+- Compact center button for the radial menu inside the dashboard
+- Press/hold to expand into your preferred radial section: Breadcrumbs, Commands, or Recents
+- Release over a slot to select it; release anywhere else to collapse back to the compact button
+- New installs use this in the Full preset instead of the persistent Active Cluster graph
 
 **Recently Touched / Modified**
 - Segmented `TOUCHED | MODIFIED` header — tap either side to switch
@@ -60,6 +66,59 @@ A bottom-sheet modal with modular widgets:
 - Pull down past the top of the dashboard scroll, release to instantly create a new note
 - Haptic feedback on Android
 
+**Pomodoro Timer** *(widget, off by default — appears only if [Pomodoro Timer](https://github.com/eatgrass/obsidian-pomodoro-timer) is installed)*
+- Live countdown, current mode (Focus/Break), tap to start/pause
+
+**Git Status** *(widget, off by default — appears only if [Obsidian Git](https://github.com/Vinzent03/obsidian-git) is installed)*
+- Current branch, changed/staged file count, conflict warning
+- Tap to commit-and-sync
+
+---
+
+## Extending ReadyBoard
+
+Every dashboard widget — including all the built-in ones above — is registered through the same public API, so adding your own is the same amount of work as ReadyBoard's own widgets. No fork, no PR, no special-casing.
+
+From your own plugin:
+
+```ts
+const readyBoard = app.plugins.plugins['readyboard'] as
+  | { api?: { registerWidget(def: unknown): () => void } }
+  | undefined;
+
+const unregister = readyBoard?.api?.registerWidget({
+  id: 'my-plugin-streaks',      // namespace it so it can't collide with another plugin's widget
+  label: 'Writing Streak',       // shown as the toggle label in ReadyBoard's settings
+  render: (root, ctx) => {
+    root.createEl('div', { text: `${myStreak()} day streak` });
+  },
+});
+
+// in your plugin's onunload:
+unregister?.();
+```
+
+Once registered, your widget shows up as a disabled-by-default toggle in ReadyBoard's dashboard settings — the user opts in exactly like a built-in. If ReadyBoard isn't installed, `app.plugins.plugins['readyboard']` is `undefined` and the optional chaining above just no-ops.
+
+**The context object (`ctx`) your `render` function receives:**
+
+| Field | Type | What it's for |
+|---|---|---|
+| `app` | `App` | The usual Obsidian API surface |
+| `settings` | `ReadonlyDeep<PluginSettings>` | ReadyBoard's own settings, read-only |
+| `getPlugin(id)` | `<T>(id: string) => T \| undefined` | Look up another installed plugin's instance by manifest id (e.g. integrating with a sibling plugin the way `src/widgets/git.ts`/`pomodoro.ts` do) — returns `undefined` if it's not installed/enabled. You're still responsible for checking the shape of what comes back before calling into it. |
+| `close()` | `() => void` | Dismiss the dashboard (closes the modal, or collapses the sidebar) |
+| `openFile(file)` | `(file: TFile) => void` | Closes the dashboard, then opens `file` — the common "tap a note" pattern |
+| `vibrate(ms)` | `(durationMs: number) => void` | Short haptic pulse, no-op where unsupported |
+| `editSettings(mutate)` | `(mutate: (settings) => void) => Promise<void>` | Persist your own bit of state (a selected filter, a last-used mode) the same way ReadyBoard's built-ins do |
+| `onCleanup(fn)` | `(fn: () => void) => void` | Register a teardown — needed if your widget subscribes to another plugin's live store, otherwise a Modal-hosted dashboard leaks a new subscription on every open |
+
+`render` can be `async` (e.g. to read a file before showing anything), and is called fresh every time the dashboard renders — do your own DOM cleanup the same way the rest of the dashboard does, since `root` is discarded on the next render/close.
+
+**If your widget shows something that changes on its own** (a countdown, another plugin's live state), prefer subscribing directly to that plugin's own reactive API if it has one (e.g. a Svelte store) rather than duplicating its timing logic. The sidebar surface stays "warm" between opens (`render` only runs once per session, not on every reveal) and collapsing it is purely visual — it doesn't tear down your view, so a plain subscribe-and-redraw stays accurate the whole time the dashboard is hidden. Tear the subscription down via `onCleanup`. Only reach for your own `setInterval` loop if the source plugin has no push-based way to observe changes. ReadyBoard's own Pomodoro widget (`src/widgets/pomodoro.ts`) is a working example: it subscribes to the Pomodoro Timer plugin's own store directly, with no extra polling.
+
+Your widget's source files live wherever you like — there's no folder-scanning step. ReadyBoard's own built-ins follow a one-file-per-widget layout (`src/widgets/*.ts`, each exporting a single definition object) purely as a convention; nothing about the API requires it.
+
 ---
 
 ## Settings
@@ -87,6 +146,7 @@ A bottom-sheet modal with modular widgets:
 | Setting | Description |
 |---|---|
 | Default mode | Which mode the radial opens in (default: Breadcrumbs) |
+| Dashboard radial section | Which radial section the dashboard launcher expands into |
 | Remember last mode | Reopen in whatever mode you last used, instead of the default |
 | Connect radial & dashboard | Enables the swipe-to-dashboard gesture and the return button |
 | Radial Commands | Six configurable slots for Commands mode (label, icon, icon type, action) |
@@ -105,7 +165,7 @@ Not yet in the Community Plugins directory.
 
 ### Manual
 
-Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/112345brian/obsidian-mobile-quick-widget/releases/latest) and place them in `.obsidian/plugins/mobile-quick-widget/`.
+Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/112345brian/obsidian-mobile-quick-widget/releases/latest) and place them in `.obsidian/plugins/readyboard/`.
 
 ---
 
@@ -118,13 +178,15 @@ The plugin gracefully degrades when these aren't installed:
 - **Continue** — supplies the Touched list with richer navigation history
 - **Templater** — processes template syntax after new note creation
 - **Homepage** — fallback for the Homepage pulse card
+- **Pomodoro Timer** — powers the Pomodoro dashboard widget (live countdown, tap to start/pause)
+- **Obsidian Git** — powers the Git Status dashboard widget (branch, change count, tap to commit-and-sync)
 
 ---
 
 ## Debugging
 
 ```js
-window.DEBUG.enable('mobile-quick-widget');
+window.DEBUG.enable('readyboard');
 ```
 
 ---

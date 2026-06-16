@@ -29,7 +29,17 @@ export const RADIAL_COMMAND_DEFAULTS: QuickAction[] = [
   { label: 'Daily',     icon: '◈', iconType: 'glyph', action: 'command', commandId: 'daily-notes:goto-today' },
 ];
 
-export type DashboardWidgetType = 'continue' | 'new-note' | 'trash' | 'graph' | 'tasks';
+// Not a closed union — third-party plugins can register their own widget
+// ids via the public API (see DashboardWidgetApi.ts) and they're stored
+// here the same way built-ins are.
+export type DashboardWidgetType = string;
+
+// The built-in widget ids — must mirror BUILTIN_WIDGETS in widgets/index.ts.
+// (Note: vault "trash"/needs-review surfaces as a Pulse Card, not a
+// dashboard widget — there's no 'trash' widget type.)
+export const BUILTIN_DASHBOARD_WIDGET_TYPES: DashboardWidgetType[] = [
+  'radial', 'graph', 'continue', 'tasks', 'new-note', 'pomodoro', 'git',
+];
 
 export interface DashboardWidget {
   type: DashboardWidgetType;
@@ -45,23 +55,21 @@ export const DASHBOARD_PRESETS: Record<DashboardPreset, { label: string; widgets
       { type: 'continue', enabled: true },
       { type: 'tasks', enabled: false },
       { type: 'new-note', enabled: true },
-      { type: 'trash', enabled: false },
     ],
   },
   full: {
     label: 'Full',
     widgets: [
-      { type: 'graph', enabled: true },
+      { type: 'radial', enabled: true },
+      { type: 'graph', enabled: false },
       { type: 'continue', enabled: true },
       { type: 'tasks', enabled: false },
-      { type: 'trash', enabled: true },
       { type: 'new-note', enabled: false },
     ],
   },
   triage: {
     label: 'Triage',
     widgets: [
-      { type: 'trash', enabled: true },
       { type: 'continue', enabled: true },
       { type: 'tasks', enabled: false },
       { type: 'new-note', enabled: true },
@@ -69,13 +77,34 @@ export const DASHBOARD_PRESETS: Record<DashboardPreset, { label: string; widgets
   },
 };
 
-export const WIDGET_LABELS: Record<DashboardWidgetType, string> = {
-  continue: 'Recently Touched',
-  graph: 'Active Cluster (graph)',
-  trash: 'Needs Review',
-  'new-note': 'More Actions',
-  tasks: 'Open Tasks',
-};
+// Inserts any widget id from `knownIds` that's missing from the user's saved
+// list (e.g. a built-in added after they last saved, or a third-party widget
+// that just registered) as newly-available but OFF by default. Never drops
+// an existing entry, even an id outside `knownIds` — that id might belong to
+// a plugin that just hasn't finished loading yet, and dropping it would look
+// to the user like the plugin silently deleted their widget.
+export function normalizeDashboardWidgets(
+  widgets: readonly DashboardWidget[],
+  knownIds: readonly string[] = BUILTIN_DASHBOARD_WIDGET_TYPES,
+): DashboardWidget[] {
+  const output: DashboardWidget[] = [];
+  const seen = new Set<string>();
+
+  for (const widget of widgets) {
+    if (seen.has(widget.type)) continue;
+    output.push({ type: widget.type, enabled: widget.enabled });
+    seen.add(widget.type);
+  }
+
+  for (const type of knownIds) {
+    if (!seen.has(type)) {
+      output.push({ type, enabled: false });
+      seen.add(type);
+    }
+  }
+
+  return output;
+}
 
 export type NewNoteFilenameFormat = 'untitled' | 'zettelkasten' | 'custom';
 
@@ -122,8 +151,19 @@ export class PluginSettings {
   public radialDefaultMode: RadialMode = 'breadcrumbs';
   public radialRememberLast = false;
   public radialLastMode: RadialMode = 'breadcrumbs';
+  public dashboardRadialMode: RadialMode = 'breadcrumbs';
+  public dashboardRadialLastMode: RadialMode = 'breadcrumbs';
+  public dashboardRadialInteraction: DashboardRadialInteraction = 'press-hold';
   public connectSurfaces = true;
   public radialCommands: QuickAction[] = RADIAL_COMMAND_DEFAULTS.map((c) => ({ ...c }));
+  public dashboardSidebarSide: 'left' | 'right' = 'right';
 }
 
 export type RadialMode = 'breadcrumbs' | 'commands' | 'recents';
+
+// 'press-hold': press the center to reveal the ring, drag to a slot and
+//   release to select, release elsewhere (or cancel) to collapse.
+// 'tap-toggle': tap the center to open and it stays open; tap a slot to
+//   select; tap the center again to cycle modes; double-tap the center
+//   (or tap outside the ring) to collapse.
+export type DashboardRadialInteraction = 'press-hold' | 'tap-toggle';

@@ -1,5 +1,7 @@
 import type { App, TFile } from 'obsidian';
 
+import { getExternalPlugin } from './externalPlugin.ts';
+
 // ── Breadcrumbs plugin shim (for parent lookup) ──────────────────────────────
 
 interface BCGraph {
@@ -8,9 +10,8 @@ interface BCGraph {
 }
 
 export function getBCGraph(app: App): BCGraph | null {
-  const p = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
-    .plugins?.plugins?.['breadcrumbs'] as { graph?: BCGraph } | undefined;
-  return p?.graph ?? null;
+  const plugin = getExternalPlugin<{ graph?: BCGraph }>(app, 'breadcrumbs');
+  return plugin?.graph ?? null;
 }
 
 // ── Bread-trail / Breadcrumbs relation resolver ──────────────────────────────

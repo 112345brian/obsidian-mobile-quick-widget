@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0 — 2026-06-16
+
+### Breaking
+- **Renamed the plugin to ReadyBoard** (id: `mobile-quick-widget` → `readyboard`). Since the plugin ID changed, Obsidian treats this as a different plugin: it now lives in `.obsidian/plugins/readyboard/` instead of `.obsidian/plugins/mobile-quick-widget/`, and command IDs are now prefixed `readyboard:...`. Existing gesture/hotkey bindings to the old command IDs need to be reassigned. Settings (`data.json`) carry over unchanged since the settings shape itself didn't change — only the folder it lives in.
+
+### Added
+- **Public widget API** — any plugin can register its own dashboard widget via `app.plugins.plugins['readyboard'].api.registerWidget(...)`. Every built-in widget (Recently Touched, Active Cluster graph, Radial Launcher, Open Tasks, More Actions, Pomodoro) is now registered through this exact same mechanism — there is no separate "built-in" code path, so the API is necessarily as capable as ReadyBoard's own widgets. See the README's "Extending ReadyBoard" section.
+- Each built-in widget now lives in its own file under `src/widgets/`, one definition per file, aggregated by `src/widgets/index.ts` — a deliberate architectural choice so adding a widget (built-in or third-party) never means touching a large shared file.
+- **Pomodoro widget** (off by default) — shows up only if [Pomodoro Timer](https://github.com/eatgrass/obsidian-pomodoro-timer) is installed. Live countdown, current mode, tap to start/pause. Subscribes directly to that plugin's own reactive store rather than polling, so it stays accurate whether you're looking at the modal or revealing the sidebar after it's been collapsed for a while.
+- **Git Status widget** (off by default) — shows up only if [Obsidian Git](https://github.com/Vinzent03/obsidian-git) is installed. Current branch, changed/staged file count, conflict warning, tap to commit-and-sync. Listens for that plugin's own `obsidian-git:status-changed` workspace event instead of polling.
+- **Dashboard as a sidebar** — new "Open dashboard in sidebar" command, independent of the existing "Open dashboard" (modal) command. The sidebar view stays warm between opens (collapses rather than destroying the leaf), so widget state — which TOUCHED/MODIFIED tab was active, which radial mode was last cycled to — persists across reveals instead of rebuilding from zero every time. New setting: **Dashboard sidebar side** (left/right).
+- Dashboard **Radial Launcher** widget: a compact radial center button that expands into the preferred radial section while pressed; releasing without selecting collapses it back down.
+
+### Fixed
+- The dashboard's "Needs Review" widget toggle was dead — `trash` was never a real dashboard widget (only a Pulse Card), so enabling it did nothing. Removed it from presets; the working Pulse Card version is unaffected.
+- The breadcrumb radial's overflow slot (shown when a note has more children than fit) used to redirect to the *other* radial surface — the dashboard's embedded launcher opened the full-screen radial menu, and the full-screen menu's own overflow slot opened the dashboard right back. For a note with more than 2 children, tapping overflow on either surface bounced forever without ever showing the extra children. It now opens a simple menu listing the overflowed children directly, on both surfaces.
+- Keyboard arrow-key navigation in the dashboard sidebar went dead after the sidebar was collapsed and revealed again, since focus was only ever applied once (on the sidebar's first render) and revealing an already-open sidebar leaf doesn't re-run that setup. Revealing the sidebar now re-applies focus every time.
+- Sidebar/Modal widgets that integrate with another installed plugin (Pomodoro Timer, Obsidian Git) now go through a single shared `ctx.getPlugin(id)` lookup instead of each hand-rolling the same unsafe cast into Obsidian's internal plugin registry — also now part of the public widget API, so third-party widgets get the same helper.
+
+---
+
 ## 0.2.1 — 2026-06-16
 
 ### Fixed

@@ -3,13 +3,14 @@ import type { ReadonlyDeep } from 'type-fest';
 
 import { Modal, setIcon } from 'obsidian';
 
-import type { PluginSettings, QuickActionIconType, RadialMode } from '../PluginSettings.ts';
+import type { PluginSettings, RadialMode } from '../PluginSettings.ts';
 import type { CategorizedNeighbors } from '../breadcrumbs.ts';
+import type { DashboardWidgetRegistry } from '../DashboardWidgetApi.ts';
+import type { RadialSlotData } from '../radialSlots.ts';
 
 import { getCategorizedNeighbors } from '../breadcrumbs.ts';
-import { executeQuickAction } from '../quickActions.ts';
-import { getRecentFiles } from '../recents.ts';
-import { truncate } from '../text.ts';
+import { vibrate } from '../haptics.ts';
+import { buildBreadcrumbSlots, buildCommandSlots, buildRecentSlots, showOverflowMenu } from '../radialSlots.ts';
 import { DashboardModal } from './DashboardModal.ts';
 
 // Six ring-button positions in the 340×340 wrap coordinate space.
@@ -24,17 +25,7 @@ const SLOTS: SlotPos[] = [
   { left: 75,  top: 115, clock: '10' },
 ];
 
-type SlotKind = 'parent' | 'child' | 'sibling' | 'cmd' | 'recent' | 'overflow';
-
-interface SlotData {
-  kind: SlotKind;
-  label: string;          // text under the circle
-  arrow?: string;         // breadcrumb directional arrow (↑ ↓ → ←)
-  title?: string;         // breadcrumb note title inside the circle
-  icon?: string;          // command icon/glyph inside the circle
-  iconType?: QuickActionIconType | undefined; // how to render `icon` — defaults to 'lucide'
-  onTap?: () => void;     // null/undefined → ghosted/empty slot
-}
+type SlotData = RadialSlotData;
 
 const MODE_ORDER: RadialMode[] = ['breadcrumbs', 'commands', 'recents'];
 const MODE_LABEL: Record<RadialMode, string> = { breadcrumbs: 'Breadcrumbs', commands: 'Commands', recents: 'Recents' };
@@ -42,17 +33,20 @@ const MODE_ABBR: Record<RadialMode, string> = { breadcrumbs: 'BC', commands: 'CM
 
 export class RadialMenuV3Modal extends Modal {
   private readonly settings: ReadonlyDeep<PluginSettings>;
-  private readonly saveLastMode: (mode: RadialMode) => void;
+  private readonly editSettings: (mutate: (settings: PluginSettings) => void | Promise<void>) => Promise<void>;
+  private readonly dashboardWidgetRegistry: DashboardWidgetRegistry;
   private mode: RadialMode;
 
   public constructor(
     app: App,
     settings: ReadonlyDeep<PluginSettings>,
-    saveLastMode: (mode: RadialMode) => void = (): void => { /* noop */ },
+    editSettings: (mutate: (settings: PluginSettings) => void | Promise<void>) => Promise<void>,
+    dashboardWidgetRegistry: DashboardWidgetRegistry,
   ) {
     super(app);
     this.settings = settings;
-    this.saveLastMode = saveLastMode;
+    this.editSettings = editSettings;
+    this.dashboardWidgetRegistry = dashboardWidgetRegistry;
     let initial = settings.radialRememberLast ? settings.radialLastMode : settings.radialDefaultMode;
     // Defend against a stale/hand-edited settings value outside the known modes.
     if (!MODE_ORDER.includes(initial)) initial = 'breadcrumbs';
@@ -98,7 +92,7 @@ export class RadialMenuV3Modal extends Modal {
       const delta = (e.changedTouches[0]?.clientY ?? startY) - startY;
       if (delta >= THRESHOLD) {
         this.close();
-        new DashboardModal(this.app, this.settings).open();
+        new DashboardModal(this.app, this.settings, this.editSettings, this.dashboardWidgetRegistry).open();
       }
     });
 
@@ -110,9 +104,10 @@ export class RadialMenuV3Modal extends Modal {
   }
 
   private cycleMode(): void {
+    vibrate(8);
     const i = MODE_ORDER.indexOf(this.mode);
     this.mode = MODE_ORDER[(i + 1) % MODE_ORDER.length]!;
-    if (this.settings.radialRememberLast) this.saveLastMode(this.mode);
+    if (this.settings.radialRememberLast) void this.editSettings((s) => { s.radialLastMode = this.mode; });
     this.render();
   }
 
@@ -172,7 +167,7 @@ export class RadialMenuV3Modal extends Modal {
         e.stopPropagation();
         if (this.mode !== m) {
           this.mode = m;
-          if (this.settings.radialRememberLast) this.saveLastMode(m);
+          if (this.settings.radialRememberLast) void this.editSettings((s) => { s.radialLastMode = m; });
           this.render();
         }
       });
@@ -206,7 +201,7 @@ export class RadialMenuV3Modal extends Modal {
     if (data) btn.createEl('div', { cls: 'qw-radial-btn-label', text: data.label });
 
     if (data?.onTap) {
-      btn.addEventListener('click', (e) => { e.stopPropagation(); data.onTap!(); });
+      btn.addEventListener('click', (e) => { e.stopPropagation(); vibrate(8); data.onTap!(e); });
     }
   }
 
@@ -227,69 +222,19 @@ export class RadialMenuV3Modal extends Modal {
   }
 
   private breadcrumbSlots(nb: CategorizedNeighbors | null): (SlotData | undefined)[] {
-    if (!nb) return new Array<SlotData | undefined>(6).fill(undefined);
-
-    // Right flank prefers the explicit "next" sequence note, left prefers "prev".
-    // Remaining sibling slots are filled from a shared queue so none is dropped
-    // or shown on both sides.
-    const sibQueue = [...nb.siblings];
-    const rightSibling = nb.next[0] ?? sibQueue.shift();
-    const leftSibling = nb.prev[0] ?? sibQueue.shift();
-
-    const parentSlot = (f: TFile | undefined): SlotData | undefined =>
-      f ? { kind: 'parent', label: 'parent', arrow: '↑', title: truncate(f.basename, 12), onTap: () => this.openFile(f) } : undefined;
-    const childSlot = (f: TFile | undefined): SlotData | undefined =>
-      f ? { kind: 'child', label: 'child', arrow: '↓', title: truncate(f.basename, 12), onTap: () => this.openFile(f) } : undefined;
-    const siblingSlot = (f: TFile | undefined, arrow: string): SlotData | undefined =>
-      f ? { kind: 'sibling', label: 'sibling', arrow, title: truncate(f.basename, 12), onTap: () => this.openFile(f) } : undefined;
-
-    // 8 o'clock: overflow if there are more children than the two child slots
-    const extraChildren = nb.children.length - 2;
-    const overflowSlot: SlotData | undefined = extraChildren > 0
-      ? { kind: 'overflow', label: 'children', onTap: () => { this.close(); new DashboardModal(this.app, this.settings).open(); } }
-      : childSlot(nb.children[2]);
-    if (overflowSlot?.kind === 'overflow') overflowSlot.label = `+${extraChildren}`;
-
-    // Order matches SLOTS: [12, 2, 4, 6, 8, 10]
-    return [
-      parentSlot(nb.parents[0]),
-      siblingSlot(rightSibling, '→'),
-      childSlot(nb.children[0]),
-      childSlot(nb.children[1]),
-      overflowSlot,
-      siblingSlot(leftSibling, '←'),
-    ];
+    return buildBreadcrumbSlots(
+      nb,
+      (file) => this.openFile(file),
+      (overflowChildren, event) => { showOverflowMenu(overflowChildren, event, (file) => this.openFile(file)); },
+    );
   }
 
   private commandSlots(): (SlotData | undefined)[] {
-    const commands = this.settings.radialCommands ?? [];
-    const slots: (SlotData | undefined)[] = [];
-    for (let i = 0; i < 6; i++) {
-      const action = commands[i];
-      slots.push(action
-        ? {
-            kind: 'cmd',
-            icon: action.icon || '·',
-            iconType: action.iconType,
-            label: action.label,
-            onTap: () => { void executeQuickAction(this.app, this.settings, action, () => this.close()); },
-          }
-        : undefined);
-    }
-    return slots;
+    return buildCommandSlots(this.app, this.settings, this.settings.radialCommands ?? [], () => this.close());
   }
 
   private recentSlots(): (SlotData | undefined)[] {
-    const files = getRecentFiles(this.app, this.settings.continueExcluded ?? [], 6);
-
-    const slots: (SlotData | undefined)[] = [];
-    for (let i = 0; i < 6; i++) {
-      const f = files[i];
-      slots.push(f
-        ? { kind: 'recent', label: truncate(f.basename, 12), onTap: () => this.openFile(f) }
-        : undefined);
-    }
-    return slots;
+    return buildRecentSlots(this.app, this.settings.continueExcluded ?? [], (file) => this.openFile(file));
   }
 
   // ── SVG guide layer (arc segments + spokes), static per mode ───────────────

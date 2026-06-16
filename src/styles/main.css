@@ -7,9 +7,11 @@
   --qw-mono: var(--font-monospace, 'JetBrains Mono', monospace);
 }
 
-/* Dark aesthetic scoped to the dashboard — same palette as the mockup */
-.qw-dash-modal,
-.qw-dash-modal .modal-content {
+/* Dark aesthetic scoped to the dashboard content itself — same palette as
+   the mockup. Lives on .qw-dash (the content root DashboardContent always
+   creates) rather than a host-specific class, so it works the same whether
+   the host is the bottom-sheet Modal or a sidebar ItemView. */
+.qw-dash {
   --qw-bg: #0d0d10;
   --qw-surface: #141416;
   --qw-surface2: #1a1a1e;
@@ -390,6 +392,100 @@
   opacity: 0.3;
 }
 
+/* ── Pomodoro card ── */
+
+.qw-dash-pomodoro-card {
+  margin: 0 16px 20px;
+  padding: 16px;
+  background: var(--qw-surface);
+  border: 1px solid var(--qw-border);
+  border-radius: 14px;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: opacity 0.1s, border-color 0.15s;
+}
+
+.qw-dash-pomodoro-card:active {
+  opacity: 0.7;
+}
+
+.qw-dash-pomodoro-card--running {
+  border-color: var(--qw-purple-border);
+}
+
+.qw-dash-pomodoro-mode {
+  font-family: var(--qw-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--qw-purple-bright);
+}
+
+.qw-dash-pomodoro-mode--break {
+  color: var(--qw-gold);
+}
+
+.qw-dash-pomodoro-time {
+  font-family: var(--qw-mono);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--qw-text-primary);
+  line-height: 1.3;
+}
+
+.qw-dash-pomodoro-state {
+  font-size: 10px;
+  color: var(--qw-text-muted);
+}
+
+/* ── Git card ── */
+
+.qw-dash-git-card {
+  margin: 0 16px 20px;
+  padding: 16px;
+  background: var(--qw-surface);
+  border: 1px solid var(--qw-border);
+  border-radius: 14px;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.qw-dash-git-card:active {
+  opacity: 0.7;
+}
+
+.qw-dash-git-card--dirty {
+  border-color: var(--qw-gold);
+}
+
+.qw-dash-git-card--conflict {
+  border-color: #bf5c7c;
+}
+
+.qw-dash-git-branch {
+  font-family: var(--qw-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--qw-text-primary);
+}
+
+.qw-dash-git-status {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--qw-text-muted);
+}
+
+.qw-dash-git-card--dirty .qw-dash-git-status {
+  color: var(--qw-gold);
+}
+
+.qw-dash-git-card--conflict .qw-dash-git-status {
+  color: #bf5c7c;
+}
+
 /* ── Task card ── */
 
 .qw-dash-task-card {
@@ -613,7 +709,7 @@
   flex-shrink: 0;
 }
 
-.qw-dash-modal .qw-dash-graph-btn {
+.qw-dash-host .qw-dash-graph-btn {
   all: unset !important;
   font-family: var(--qw-mono) !important;
   font-size: 10px !important;
@@ -623,9 +719,244 @@
   cursor: pointer !important;
 }
 
-.qw-dash-modal .qw-dash-graph-btn:active {
+.qw-dash-host .qw-dash-graph-btn:active {
   opacity: 0.5 !important;
 }
+
+/* ── Dashboard radial launcher ── */
+
+.qw-dash-radial-card {
+  margin: 0 16px 20px;
+  min-height: 112px;
+  background: var(--qw-surface);
+  border: 1px solid var(--qw-border);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: min-height 0.18s ease;
+}
+
+.qw-dash-radial-card--expanded {
+  min-height: 282px;
+}
+
+.qw-dash-host .qw-dash-radial-compact-center,
+.qw-dash-host .qw-dash-radial-expanded-center {
+  all: unset !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+  touch-action: none !important;
+}
+
+.qw-dash-host .qw-dash-radial-mini-btn {
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+  touch-action: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.qw-dash-radial-stage {
+  width: 260px;
+  height: 260px;
+  position: relative;
+  flex: 0 0 auto;
+  user-select: none;
+  touch-action: none;
+}
+
+.qw-dash-radial-guide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.qw-dash-radial-compact-center,
+.qw-dash-radial-expanded-center {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.qw-dash-radial-expanded-center {
+  position: absolute !important;
+  top: 130px;
+  left: 130px;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+}
+
+.qw-dash-radial-center-outer {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 1px solid rgba(155, 124, 232, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: qw-radial-pulse 3s ease-in-out infinite;
+}
+
+.qw-dash-radial-center-mid {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #1a1428;
+  border: 1.5px solid var(--qw-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 18px rgba(124, 92, 191, 0.35), inset 0 0 10px rgba(124, 92, 191, 0.08);
+}
+
+.qw-dash-radial-center-inner {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--qw-purple);
+  box-shadow: 0 0 10px rgba(124, 92, 191, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qw-dash-radial-center-label {
+  font-family: var(--qw-mono);
+  font-size: 8px;
+  font-weight: 600;
+  color: #d4b8ff;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.qw-dash-radial-mini-btn {
+  position: absolute !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 5px !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+.qw-dash-radial-mini-btn--ghost {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.qw-dash-radial-mini-face {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s ease;
+}
+
+.qw-dash-radial-mini-btn:active .qw-dash-radial-mini-face {
+  transform: scale(0.91);
+}
+
+.qw-radial-slot-cmd .qw-dash-radial-mini-face {
+  background: #1c1a28;
+  border: 1.5px solid #3d2d6b;
+}
+
+.qw-radial-slot-parent .qw-dash-radial-mini-face {
+  background: rgba(201, 168, 76, 0.07);
+  border: 1.5px solid rgba(201, 168, 76, 0.3);
+}
+
+.qw-radial-slot-child .qw-dash-radial-mini-face {
+  background: rgba(76, 168, 160, 0.07);
+  border: 1.5px solid rgba(76, 168, 160, 0.3);
+}
+
+.qw-radial-slot-sibling .qw-dash-radial-mini-face {
+  background: rgba(191, 92, 124, 0.07);
+  border: 1.5px solid rgba(191, 92, 124, 0.3);
+}
+
+.qw-radial-slot-recent .qw-dash-radial-mini-face {
+  background: #16161e;
+  border: 1.5px solid #2a2840;
+}
+
+.qw-radial-slot-overflow .qw-dash-radial-mini-face {
+  background: rgba(76, 168, 160, 0.04);
+  border: 1.5px dashed rgba(76, 168, 160, 0.2);
+}
+
+.qw-radial-slot-empty .qw-dash-radial-mini-face {
+  background: #131318;
+  border: 1.5px solid #1e1e26;
+}
+
+.qw-dash-radial-mini-icon {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--qw-purple-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qw-dash-radial-mini-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.qw-dash-radial-mini-arrow {
+  font-family: var(--qw-mono);
+  font-size: 11px;
+  display: block;
+  line-height: 1;
+}
+
+.qw-dash-radial-mini-title {
+  font-family: var(--qw-mono);
+  font-size: 7px;
+  line-height: 1.3;
+  max-width: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qw-radial-slot-parent .qw-dash-radial-mini-arrow { color: var(--qw-gold); }
+.qw-radial-slot-parent .qw-dash-radial-mini-title { color: rgba(201, 168, 76, 0.75); }
+.qw-radial-slot-child .qw-dash-radial-mini-arrow { color: #4ca8a0; }
+.qw-radial-slot-child .qw-dash-radial-mini-title { color: rgba(76, 168, 160, 0.75); }
+.qw-radial-slot-sibling .qw-dash-radial-mini-arrow { color: #bf5c7c; }
+.qw-radial-slot-sibling .qw-dash-radial-mini-title { color: rgba(191, 92, 124, 0.7); }
+
+.qw-dash-radial-mini-label {
+  font-family: var(--qw-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #3e3e52;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.qw-radial-slot-parent .qw-dash-radial-mini-label { color: rgba(201, 168, 76, 0.4); }
+.qw-radial-slot-child .qw-dash-radial-mini-label { color: rgba(76, 168, 160, 0.4); }
+.qw-radial-slot-sibling .qw-dash-radial-mini-label { color: rgba(191, 92, 124, 0.4); }
 
 /* ── Quick actions ── */
 
@@ -636,7 +967,7 @@
   padding: 0 16px;
 }
 
-.qw-dash-modal .qw-dash-action-btn {
+.qw-dash-host .qw-dash-action-btn {
   all: unset !important;
   display: flex !important;
   align-items: center !important;
@@ -653,7 +984,7 @@
   transition: opacity 0.1s !important;
 }
 
-.qw-dash-modal .qw-dash-action-btn:active {
+.qw-dash-host .qw-dash-action-btn:active {
   opacity: 0.7 !important;
 }
 
@@ -722,31 +1053,31 @@
 
 /* ── Right-handed mode ── */
 
-.qw-dash-modal--right .qw-dash-section-label {
+.qw-dash--right .qw-dash-section-label {
   text-align: right;
 }
 
-.qw-dash-modal--right .qw-dash-segment-header {
+.qw-dash--right .qw-dash-segment-header {
   flex-direction: row-reverse;
 }
 
-.qw-dash-modal--right .qw-dash-pulse-row {
+.qw-dash--right .qw-dash-pulse-row {
   flex-direction: row-reverse;
 }
 
-.qw-dash-modal--right .qw-dash-note-title-row {
+.qw-dash--right .qw-dash-note-title-row {
   flex-direction: row-reverse;
 }
 
-.qw-dash-modal--right .qw-dash-note-detail {
+.qw-dash--right .qw-dash-note-detail {
   flex-direction: row-reverse;
 }
 
-.qw-dash-modal--right .qw-dash-task-row {
+.qw-dash--right .qw-dash-task-row {
   flex-direction: row-reverse;
 }
 
-.qw-dash-modal--right .qw-dash-graph-footer {
+.qw-dash--right .qw-dash-graph-footer {
   flex-direction: row-reverse;
 }
 
@@ -903,7 +1234,7 @@
 .qw-radial-slot-parent .qw-radial-bc-title { color: rgba(201,168,76,0.75); }
 .qw-radial-slot-child .qw-radial-bc-arrow { color: var(--r-teal); }
 .qw-radial-slot-child .qw-radial-bc-title { color: rgba(76,168,160,0.75); }
-.qw-radial-slot-sibling .qw-radial-bc-arrow { color: var(--r-rose); }
+.qw-radial-slot-sibling .qw-radial-bc-arrow { color: #bf5c7c; }
 .qw-radial-slot-sibling .qw-radial-bc-title { color: rgba(191,92,124,0.7); }
 .qw-radial-slot-overflow .qw-radial-bc-title { color: rgba(76,168,160,0.4); }
 
@@ -985,3 +1316,9 @@
 }
 .qw-radial-mode-key-item.active { color: var(--r-purple-bright); opacity: 1; }
 .qw-radial-mode-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* ── Settings tab utility ── */
+
+.qw-hidden {
+  display: none;
+}

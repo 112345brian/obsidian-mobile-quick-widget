@@ -1,15 +1,16 @@
 import type { App, TFile } from 'obsidian';
 
+import { getExternalPlugin } from './externalPlugin.ts';
+
 // Continue plugin exposes a navigation log richer than Obsidian's own list.
 interface ContinuePlugin {
   openedLog: string[];
 }
 
 function getContinuePlugin(app: App): ContinuePlugin | null {
-  const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
-    .plugins?.plugins?.['obsidian-continue'];
-  if (!plugin || !Array.isArray((plugin as ContinuePlugin).openedLog)) return null;
-  return plugin as ContinuePlugin;
+  const plugin = getExternalPlugin<ContinuePlugin>(app, 'obsidian-continue');
+  if (!plugin || !Array.isArray(plugin.openedLog)) return null;
+  return plugin;
 }
 
 export function isExcluded(file: TFile, excluded: readonly string[]): boolean {

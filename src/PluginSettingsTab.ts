@@ -1,11 +1,11 @@
 import { Setting } from 'obsidian';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab-base';
 
-import type { DashboardWidget, NewNoteFilenameFormat, PulseCard, QuickAction, QuickActionIconType, RadialMode } from './PluginSettings.ts';
+import type { DashboardRadialInteraction, DashboardWidget, NewNoteFilenameFormat, PulseCard, QuickAction, QuickActionIconType, RadialMode } from './PluginSettings.ts';
 import type { PluginTypes } from './PluginTypes.ts';
 
 import { CommandPickerModal } from './Modals/CommandPickerModal.ts';
-import { DASHBOARD_PRESETS, DEFAULT_PULSE_CARDS, PULSE_CARD_LABELS, QUICK_ACTION_DEFAULTS, RADIAL_COMMAND_DEFAULTS, WIDGET_LABELS, PluginSettings } from './PluginSettings.ts';
+import { BUILTIN_DASHBOARD_WIDGET_TYPES, DASHBOARD_PRESETS, DEFAULT_PULSE_CARDS, PULSE_CARD_LABELS, QUICK_ACTION_DEFAULTS, RADIAL_COMMAND_DEFAULTS, normalizeDashboardWidgets, PluginSettings } from './PluginSettings.ts';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   public override display(): void {
@@ -139,6 +139,19 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
 
     new Setting(this.containerEl)
+      .setName('Dashboard sidebar side')
+      .setDesc('"Open dashboard" is always the bottom-sheet modal. "Open dashboard in sidebar" is a separate command — a collapsible panel that stays warm between opens (remembers which tab/mode you had open) with native edge-swipe reveal. Assign either (or both) to your own gestures/hotkeys.')
+      .addDropdown((d) => {
+        d.addOption('right', 'Right')
+          .addOption('left', 'Left')
+          .setValue(s.dashboardSidebarSide ?? 'right')
+          .onChange((val) => {
+            s.dashboardSidebarSide = val as 'left' | 'right';
+            void this.plugin.settingsManager.saveToFile();
+          });
+      });
+
+    new Setting(this.containerEl)
       .setName('Connect radial & dashboard')
       .setDesc('Swipe down on the radial menu to open the dashboard, and show a button on the dashboard to return to the radial.')
       .addToggle((t) => {
@@ -146,6 +159,33 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           s.connectSurfaces = val;
           void this.plugin.settingsManager.saveToFile();
         });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Dashboard radial section')
+      .setDesc('Which radial section the dashboard launcher expands into.')
+      .addDropdown((d) => {
+        d.addOption('breadcrumbs', 'Breadcrumbs')
+          .addOption('commands', 'Commands')
+          .addOption('recents', 'Recents')
+          .setValue(s.dashboardRadialMode ?? 'breadcrumbs')
+          .onChange((val) => {
+            s.dashboardRadialMode = val as RadialMode;
+            void this.plugin.settingsManager.saveToFile();
+          });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Dashboard radial interaction')
+      .setDesc('Press & hold: press the center, drag to a slot, release to select (release elsewhere cancels). Tap to toggle: tap the center to open it and leave it open, tap a slot to select, tap the center again to cycle modes, double-tap the center (or tap outside) to close.')
+      .addDropdown((d) => {
+        d.addOption('press-hold', 'Press & hold')
+          .addOption('tap-toggle', 'Tap to toggle')
+          .setValue(s.dashboardRadialInteraction ?? 'press-hold')
+          .onChange((val) => {
+            s.dashboardRadialInteraction = val as DashboardRadialInteraction;
+            void this.plugin.settingsManager.saveToFile();
+          });
       });
 
     new Setting(this.containerEl)
@@ -251,14 +291,18 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
     }
 
-    // Per-widget controls (ordered)
-    const widgets = s.dashboardWidgets as DashboardWidget[];
+    // Per-widget controls (ordered) — includes any third-party widget that's
+    // registered itself via the public API, not just built-ins.
+    const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.plugin.dashboardWidgetRegistry.ids()])];
+    const widgets = normalizeDashboardWidgets(s.dashboardWidgets as DashboardWidget[], knownIds);
+    s.dashboardWidgets = widgets;
     for (let i = 0; i < widgets.length; i++) {
       const widget = widgets[i];
       if (!widget) continue;
 
+      const label = this.plugin.dashboardWidgetRegistry.get(widget.type)?.label ?? widget.type;
       new Setting(this.containerEl)
-        .setName(WIDGET_LABELS[widget.type])
+        .setName(label)
         .addToggle((t) => {
           t.setValue(widget.enabled).onChange((v) => {
             widget.enabled = v;

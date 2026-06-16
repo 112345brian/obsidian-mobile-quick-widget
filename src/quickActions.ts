@@ -22,8 +22,10 @@ export async function executeQuickAction(
   switch (action.action) {
     case 'new-note': {
       close();
-      const file = await createNote(app, settings);
-      await app.workspace.getMostRecentLeaf()?.openFile(file);
+      try {
+        const file = await createNote(app, settings);
+        await app.workspace.getMostRecentLeaf()?.openFile(file);
+      } catch { /* createNote already surfaced a Notice */ }
       break;
     }
     case 'homepage': {
@@ -44,7 +46,12 @@ export async function executeQuickAction(
     }
     case 'command': {
       close();
-      if (action.commandId) app.commands.executeCommandById(action.commandId);
+      if (!action.commandId) break;
+      if (app.commands.findCommand(action.commandId)) {
+        app.commands.executeCommandById(action.commandId);
+      } else {
+        new Notice(`Command not found: ${action.commandId}`);
+      }
       break;
     }
     case 'append-to-note': {
@@ -55,11 +62,16 @@ export async function executeQuickAction(
       new AppendPromptModal(app, action.label, async (text) => {
         const file = app.vault.getFileByPath(notePath);
         if (!file) { new Notice(`Note not found: ${notePath}`); return; }
-        const line = template.replace('{{text}}', text);
-        const content = await app.vault.read(file);
-        const sep = content.endsWith('\n') ? '' : '\n';
-        await app.vault.modify(file, content + sep + line + '\n');
-        new Notice(`Added to ${file.basename}`);
+        try {
+          const line = template.replace('{{text}}', text);
+          const content = await app.vault.read(file);
+          const sep = content.endsWith('\n') ? '' : '\n';
+          await app.vault.modify(file, content + sep + line + '\n');
+          new Notice(`Added to ${file.basename}`);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          new Notice(`Couldn't append to ${file.basename}: ${message}`);
+        }
       }).open();
       break;
     }
