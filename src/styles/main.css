@@ -124,34 +124,35 @@
   max-height: 88vh !important;
   border-radius: 22px 22px 0 0 !important;
   margin: 0 !important;
-  position: relative !important;
   background: var(--qw-bg) !important;
-  /* No overflow: hidden — let modal-content scroll naturally */
+  overflow: hidden !important;
+  /* Mirror Obsidian's internal modal flex layout */
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .qw-dash-modal .modal-close-button {
   display: none !important;
 }
 
+/* flex: 1 + overflow-y: auto — the same pattern Obsidian uses internally */
 .qw-dash-modal .modal-content {
   background: var(--qw-bg) !important;
   padding: 0 !important;
-  position: relative !important;
-  height: 100% !important;
-  overflow: hidden !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
 }
 
-/* Absolutely fill modal-content and own the scroll */
-.qw-dash-scroll {
-  position: absolute;
-  inset: 0;
-  overflow-y: scroll;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.qw-dash-scroll::-webkit-scrollbar {
+.qw-dash-modal .modal-content::-webkit-scrollbar {
   display: none;
+}
+
+/* qw-dash-scroll is now just a pass-through — no height/overflow needed */
+.qw-dash-scroll {
+  display: contents;
 }
 
 .qw-dash-handle {
