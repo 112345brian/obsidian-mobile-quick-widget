@@ -26,7 +26,7 @@ export const QUICK_ACTION_DEFAULTS: QuickAction[] = [
   { label: 'Home', icon: 'home', action: 'homepage' },
 ];
 
-export type DashboardWidgetType = 'continue' | 'new-note' | 'trash' | 'graph';
+export type DashboardWidgetType = 'continue' | 'new-note' | 'trash' | 'graph' | 'tasks';
 
 export interface DashboardWidget {
   type: DashboardWidgetType;
@@ -40,6 +40,7 @@ export const DASHBOARD_PRESETS: Record<DashboardPreset, { label: string; widgets
     label: 'Focus',
     widgets: [
       { type: 'continue', enabled: true },
+      { type: 'tasks', enabled: false },
       { type: 'new-note', enabled: true },
       { type: 'trash', enabled: false },
     ],
@@ -49,6 +50,7 @@ export const DASHBOARD_PRESETS: Record<DashboardPreset, { label: string; widgets
     widgets: [
       { type: 'graph', enabled: true },
       { type: 'continue', enabled: true },
+      { type: 'tasks', enabled: false },
       { type: 'trash', enabled: true },
       { type: 'new-note', enabled: false },
     ],
@@ -58,6 +60,7 @@ export const DASHBOARD_PRESETS: Record<DashboardPreset, { label: string; widgets
     widgets: [
       { type: 'trash', enabled: true },
       { type: 'continue', enabled: true },
+      { type: 'tasks', enabled: false },
       { type: 'new-note', enabled: true },
     ],
   },
@@ -68,11 +71,12 @@ export const WIDGET_LABELS: Record<DashboardWidgetType, string> = {
   graph: 'Active Cluster (graph)',
   trash: 'Needs Review',
   'new-note': 'More Actions',
+  tasks: 'Open Tasks',
 };
 
 export type NewNoteFilenameFormat = 'untitled' | 'zettelkasten';
 
-export type PulseCardType = 'daily-note' | 'modified-today' | 'vault' | 'trash' | 'quick-action';
+export type PulseCardType = 'daily-note' | 'modified-today' | 'vault' | 'trash' | 'quick-action' | 'homepage';
 
 export interface PulseCard {
   type: PulseCardType;
@@ -86,12 +90,14 @@ export const PULSE_CARD_LABELS: Record<PulseCardType, string> = {
   'vault': 'Vault Stats',
   'trash': 'Trash (conditional)',
   'quick-action': 'Quick Action',
+  'homepage': 'Homepage',
 };
 
 export const DEFAULT_PULSE_CARDS: PulseCard[] = [
   { type: 'daily-note', enabled: true },
   { type: 'modified-today', enabled: true },
   { type: 'vault', enabled: true },
+  { type: 'homepage', enabled: false },
 ];
 
 export class PluginSettings {
@@ -108,4 +114,10 @@ export class PluginSettings {
     { label: 'New Note', icon: '+', action: 'new-note', color: '#10b981', startAngle: 270, endAngle: 360 },
   ];
   public dashboardWidgets: DashboardWidget[] = DASHBOARD_PRESETS.full.widgets.map((w) => ({ ...w }));
+  public modifiedDateField = '';
+  public handedness: 'left' | 'right' = 'left';
+  public recentListCount = 15;
+  public modifiedListCount = 15;
+  public showBreadcrumbs = false;
+  public breadcrumbField = '';
 }

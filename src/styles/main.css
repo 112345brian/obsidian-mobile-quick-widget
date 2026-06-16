@@ -386,6 +386,18 @@
   color: var(--qw-gold);
 }
 
+.qw-dash-pulse-home-icon {
+  line-height: 1;
+  margin-bottom: 0;
+}
+
+.qw-dash-pulse-home-icon svg {
+  width: 22px;
+  height: 22px;
+  color: var(--qw-purple-bright);
+  stroke: currentColor;
+}
+
 .qw-dash-pulse-sub {
   font-size: 10px;
   color: var(--qw-text-secondary);
@@ -416,6 +428,94 @@
   letter-spacing: 0.12em;
   color: var(--qw-text-muted);
   padding: 0 16px 10px;
+}
+
+/* ── Segmented header (TOUCHED | MODIFIED) ── */
+
+.qw-dash-segment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 10px;
+  font-family: var(--qw-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  user-select: none;
+}
+
+.qw-dash-segment-tab {
+  color: var(--qw-text-muted);
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.qw-dash-segment-tab--active {
+  color: var(--qw-text-normal);
+  opacity: 1;
+}
+
+.qw-dash-segment-tab:active { opacity: 0.6; }
+
+.qw-dash-segment-divider {
+  color: var(--qw-text-muted);
+  opacity: 0.3;
+}
+
+/* ── Task card ── */
+
+.qw-dash-task-card {
+  margin: 0 12px 16px;
+  background: var(--qw-surface);
+  border: 1px solid var(--qw-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.qw-dash-task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--qw-border);
+  cursor: pointer;
+}
+
+.qw-dash-task-row:last-child { border-bottom: none; }
+.qw-dash-task-row:active { background: rgba(255,255,255,0.03); }
+
+.qw-dash-task-check {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--qw-text-muted);
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.qw-dash-task-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--qw-text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qw-dash-task-src {
+  font-size: 10px;
+  color: var(--qw-text-muted);
+  opacity: 0.6;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.qw-dash-task-loading {
+  padding: 12px;
+  font-size: 11px;
+  color: var(--qw-text-muted);
+  text-align: center;
 }
 
 /* ── Note cards ── */
@@ -456,6 +556,16 @@
 .qw-dash-note-meta {
   flex: 1;
   min-width: 0;
+}
+
+.qw-dash-note-parents {
+  font-size: 10px;
+  color: var(--qw-text-muted);
+  opacity: 0.6;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .qw-dash-note-title-row {
@@ -699,4 +809,34 @@
 .qw-svg--open .qw-slice-group {
   animation: qw-slice-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   animation-delay: calc(var(--i, 0) * 40ms);
+}
+
+/* ── Right-handed mode ── */
+
+.qw-dash-modal--right .qw-dash-section-label {
+  text-align: right;
+}
+
+.qw-dash-modal--right .qw-dash-segment-header {
+  flex-direction: row-reverse;
+}
+
+.qw-dash-modal--right .qw-dash-pulse-row {
+  flex-direction: row-reverse;
+}
+
+.qw-dash-modal--right .qw-dash-note-title-row {
+  flex-direction: row-reverse;
+}
+
+.qw-dash-modal--right .qw-dash-note-detail {
+  flex-direction: row-reverse;
+}
+
+.qw-dash-modal--right .qw-dash-task-row {
+  flex-direction: row-reverse;
+}
+
+.qw-dash-modal--right .qw-dash-graph-footer {
+  flex-direction: row-reverse;
 }

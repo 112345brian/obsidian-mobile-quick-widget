@@ -81,6 +81,72 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         t.inputEl.style.width = '100%';
       });
 
+    new Setting(this.containerEl)
+      .setName('Handedness')
+      .setDesc('Right-handed mode right-aligns section headers and controls so your thumb reaches them more easily.')
+      .addDropdown((d) => {
+        d.addOption('left', 'Left-handed (default)')
+          .addOption('right', 'Right-handed')
+          .setValue(s.handedness ?? 'left')
+          .onChange((val) => {
+            s.handedness = val as 'left' | 'right';
+            void this.plugin.settingsManager.saveToFile();
+          });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Recently touched count')
+      .setDesc('Number of files to show in the Touched list.')
+      .addText((t) => {
+        t.setPlaceholder('15').setValue(String(s.recentListCount ?? 15)).onChange((val) => {
+          const n = parseInt(val, 10);
+          if (!isNaN(n) && n > 0) { s.recentListCount = n; void this.plugin.settingsManager.saveToFile(); }
+        });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Recently modified count')
+      .setDesc('Number of files to show in the Modified list.')
+      .addText((t) => {
+        t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15)).onChange((val) => {
+          const n = parseInt(val, 10);
+          if (!isNaN(n) && n > 0) { s.modifiedListCount = n; void this.plugin.settingsManager.saveToFile(); }
+        });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Show breadcrumbs')
+      .setDesc('Show the parent note above each note in the list. Uses the Breadcrumbs plugin if installed, otherwise reads the "up" frontmatter field (or your custom field below).')
+      .addToggle((t) => {
+        t.setValue(s.showBreadcrumbs ?? false).onChange((val) => {
+          s.showBreadcrumbs = val;
+          void this.plugin.settingsManager.saveToFile();
+        });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Breadcrumb field override')
+      .setDesc('Custom frontmatter field for the parent link. Leave blank to use "up".')
+      .addText((t) => {
+        t.setPlaceholder('up').setValue(s.breadcrumbField ?? '').onChange((val) => {
+          s.breadcrumbField = val.trim();
+          void this.plugin.settingsManager.saveToFile();
+        });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Modified date field')
+      .setDesc('Frontmatter field to use as the modified date in the "Recently Modified" view (e.g. date-modified). Leave blank to use file system mtime.')
+      .addText((t) => {
+        t
+          .setPlaceholder('date-modified')
+          .setValue(s.modifiedDateField ?? '')
+          .onChange((val) => {
+            s.modifiedDateField = val.trim();
+            void this.plugin.settingsManager.saveToFile();
+          });
+      });
+
     this.renderDashboardSection(s);
     this.renderPulseCardsSection(s);
     this.renderQuickActionsSection(s);
@@ -316,6 +382,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           .addOption('modified-today', PULSE_CARD_LABELS['modified-today'])
           .addOption('vault', PULSE_CARD_LABELS['vault'])
           .addOption('trash', PULSE_CARD_LABELS['trash'])
+          .addOption('homepage', PULSE_CARD_LABELS['homepage'])
           .addOption('quick-action', PULSE_CARD_LABELS['quick-action']);
         dd.onChange((val) => {
           const type = val as PulseCard['type'];
