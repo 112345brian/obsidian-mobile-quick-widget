@@ -1,20 +1,13 @@
-export interface SliceConfig {
-  label: string;
-  icon: string;
-  // SVG screen coords: 0°=right, 90°=down, 180°=left, 270°=up
-  // Default layout: bottom half (0→180) = cancel, top-left (180→270) = home, top-right (270→360) = new note
-  startAngle: number;
-  endAngle: number;
-  color: string;
-  action: 'cancel' | 'command' | 'dashboard' | 'homepage' | 'new-note';
-  commandId?: string;
-}
-
 export type QuickActionType = 'new-note' | 'homepage' | 'command' | 'append-to-note';
+
+// 'lucide' (default): icon is a Lucide icon name, rendered via setIcon.
+// 'glyph': icon is literal text/unicode (e.g. ✦), rendered as-is.
+export type QuickActionIconType = 'lucide' | 'glyph';
 
 export interface QuickAction {
   label: string;
   icon: string;
+  iconType?: QuickActionIconType;
   action: QuickActionType;
   commandId?: string;
   notePath?: string;
@@ -24,6 +17,16 @@ export interface QuickAction {
 export const QUICK_ACTION_DEFAULTS: QuickAction[] = [
   { label: 'New note', icon: 'file-plus', action: 'new-note' },
   { label: 'Home', icon: 'home', action: 'homepage' },
+];
+
+// The radial's Commands mode: six fixed slot positions [12,2,4,6,8,10 o'clock].
+export const RADIAL_COMMAND_DEFAULTS: QuickAction[] = [
+  { label: 'Capture',   icon: '✦', iconType: 'glyph', action: 'new-note' },
+  { label: 'New note',  icon: '⊕', iconType: 'glyph', action: 'new-note' },
+  { label: 'Search',    icon: '⌕', iconType: 'glyph', action: 'command', commandId: 'global-search:open' },
+  { label: 'Backlinks', icon: '⟵', iconType: 'glyph', action: 'command', commandId: 'backlink:open' },
+  { label: 'Graph',     icon: '◎', iconType: 'glyph', action: 'command', commandId: 'graph:open' },
+  { label: 'Daily',     icon: '◈', iconType: 'glyph', action: 'command', commandId: 'daily-notes:goto-today' },
 ];
 
 export type DashboardWidgetType = 'continue' | 'new-note' | 'trash' | 'graph' | 'tasks';
@@ -109,11 +112,6 @@ export class PluginSettings {
   public newNoteFilenameFormat: NewNoteFilenameFormat = 'untitled';
   public newNoteFilenameCustom = '';
   public pulseCards: PulseCard[] = DEFAULT_PULSE_CARDS.map((c) => ({ ...c }));
-  public slices: SliceConfig[] = [
-    { label: 'Cancel', icon: '✕', action: 'cancel', color: '#666666', startAngle: 0, endAngle: 180 },
-    { label: 'Home', icon: '⌂', action: 'homepage', color: '#3b82f6', startAngle: 180, endAngle: 270 },
-    { label: 'New Note', icon: '+', action: 'new-note', color: '#10b981', startAngle: 270, endAngle: 360 },
-  ];
   public dashboardWidgets: DashboardWidget[] = DASHBOARD_PRESETS.full.widgets.map((w) => ({ ...w }));
   public modifiedDateField = '';
   public handedness: 'left' | 'right' = 'left';
@@ -121,4 +119,11 @@ export class PluginSettings {
   public modifiedListCount = 15;
   public showBreadcrumbs = false;
   public breadcrumbField = '';
+  public radialDefaultMode: RadialMode = 'breadcrumbs';
+  public radialRememberLast = false;
+  public radialLastMode: RadialMode = 'breadcrumbs';
+  public connectSurfaces = true;
+  public radialCommands: QuickAction[] = RADIAL_COMMAND_DEFAULTS.map((c) => ({ ...c }));
 }
+
+export type RadialMode = 'breadcrumbs' | 'commands' | 'recents';

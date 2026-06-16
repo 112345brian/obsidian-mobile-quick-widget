@@ -3,15 +3,31 @@
 [![GitHub release](https://img.shields.io/github/v/release/112345brian/obsidian-mobile-quick-widget)](https://github.com/112345brian/obsidian-mobile-quick-widget/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/112345brian/obsidian-mobile-quick-widget/total)](https://github.com/112345brian/obsidian-mobile-quick-widget/releases)
 
-A radial pie menu and dashboard for Obsidian mobile. Assign it to a swipe gesture and tap a slice to run a command, create a note, or open the dashboard.
+A radial menu and dashboard for Obsidian mobile. Assign the radial menu to a swipe gesture, navigate your note's breadcrumbs, run commands, or jump to recent notes with one thumb.
 
 ---
 
 ## Features
 
 ### Radial Menu
-- Configurable slices — assign any Obsidian command, new note, homepage, or append-to-note
-- Smooth open/close animation
+Three modes on a single ring, switched by tapping the center node or the mode-key dots at the bottom:
+
+**Breadcrumbs** — navigate your note's hierarchy
+- Parent at top (gold ↑), children at bottom (teal ↓), siblings/sequence on the sides (rose ← →)
+- Overflow slot when there are more children than fit
+- Auto-falls back to Commands mode when there's no active note
+
+**Commands** — six fully configurable action slots
+- Defaults: Capture, New note, Search, Backlinks, Graph, Daily
+- Reassign any slot to any Quick Action (command, new note, homepage, append-to-note) in settings
+- Icons can be a Lucide icon name or a literal glyph
+
+**Recents** — last 6 opened notes, one tap to jump
+
+**Connecting to the Dashboard**
+- Swipe down on the radial to open the Dashboard
+- A button on the Dashboard returns to the radial
+- Both surfaces are stateless by default — each always opens fresh unless you enable "Remember last mode"
 
 ### Dashboard
 A bottom-sheet modal with modular widgets:
@@ -66,6 +82,14 @@ A bottom-sheet modal with modular widgets:
 | Breadcrumb field override | Custom frontmatter field for parent (default: `up`) |
 | Modified date field | Frontmatter field for modified date (default: file mtime) |
 | Continue — excluded paths | Files/folders to hide from the Touched list |
+
+### Radial Menu
+| Setting | Description |
+|---|---|
+| Default mode | Which mode the radial opens in (default: Breadcrumbs) |
+| Remember last mode | Reopen in whatever mode you last used, instead of the default |
+| Connect radial & dashboard | Enables the swipe-to-dashboard gesture and the return button |
+| Radial Commands | Six configurable slots for Commands mode (label, icon, icon type, action) |
 
 ---
 

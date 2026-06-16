@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.0 — 2026-06-16
+
+### Added
+- **New 3-mode radial menu** (replaces the old slice-based pie menu) — Breadcrumbs, Commands, and Recents modes on a single ring, faithfully ported from the design mock. Center-tap cycles modes; mode key dots show/select the current mode.
+  - **Breadcrumbs mode**: parent (top, gold ↑), children (bottom, teal ↓), siblings/sequence (sides, rose ← →), with an overflow slot when there are more children than slots. Auto-falls back to Commands mode when there's no active note.
+  - **Commands mode**: six fully configurable slots (new **Radial Commands** settings section), reusing the existing Quick Action editor. Icons support either a Lucide icon name or a literal glyph (explicit toggle, not inferred).
+  - **Recents mode**: last 6 opened notes, sharing the same recents source as the dashboard.
+  - New command: **"Open Radial Menu"** (replaces "Open Quick Menu").
+- **Radial ↔ Dashboard hand-off** — swipe down on the radial to open the dashboard; a compass button on the dashboard returns to the radial. Both gated by a new **Connect radial & dashboard** setting (on by default). Stateless: each surface always opens fresh unless **Remember last mode** is explicitly enabled.
+- New settings: **Default mode**, **Remember last mode**, **Connect radial & dashboard**, **Radial Commands** (six slots).
+
+### Changed
+- Unified the breadcrumb relationship color system across the dashboard graph and the radial menu: gold = parent, teal = child, rose = sibling/sequence. Purple is now exclusively reserved for commands/chrome on both surfaces (previously the dashboard graph used a different blue/purple/green scheme).
+- Extracted shared logic into new modules so the dashboard and radial menu behave identically: `src/breadcrumbs.ts` (relation resolver + palette), `src/recents.ts` (recent-files source), `src/quickActions.ts` (action executor), `src/text.ts` (truncation helper).
+- The dashboard's `breadcrumbField` setting now also governs the radial's and the graph's parent-relation lookup (previously only the Continue list respected it).
+
+### Removed
+- **Breaking:** the old slice-based radial menu (`SliceConfig`, the `slices` setting, the "Slices" settings section, and the "Open Quick Menu" command) has been removed entirely. Existing custom slice configurations are not migrated — reassign your swipe gesture to "Open Radial Menu".
+
+### Fixed
+- Settings manager now also cleans up purely-removed keys (like `slices`) from `data.json`, not just renamed ones.
+- Radial menu defends against a stale/invalid `radialDefaultMode` value (e.g. from hand-edited settings) instead of crashing on open.
+- `executeQuickAction`'s "Append to note" branch now closes the calling modal first, consistent with every other action type.
+- Removed a duplicate breadcrumb-relation scan that ran twice per radial render.
+
+---
+
 ## 0.1.14 — 2026-06-16
 
 ### Added

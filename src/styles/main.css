@@ -1,92 +1,4 @@
 
-.qw-modal {
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  margin: 0;
-  padding: 0;
-  touch-action: none;
-}
-
-.qw-modal .modal-close-button {
-  display: none;
-}
-
-.qw-modal .modal-content {
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  height: 100%;
-}
-
-.qw-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  background: transparent;
-}
-
-.qw-svg {
-  overflow: visible;
-  filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.5));
-}
-
-.qw-slice-group {
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.qw-slice {
-  opacity: 0.88;
-  transition: opacity 0.12s, filter 0.12s;
-}
-
-.qw-slice-group:hover .qw-slice,
-.qw-slice-group:active .qw-slice {
-  opacity: 1;
-  filter: brightness(1.2);
-}
-
-.qw-icon {
-  font-size: 28px;
-  fill: white;
-  pointer-events: none;
-  user-select: none;
-}
-
-.qw-label {
-  font-size: 13px;
-  fill: rgba(255, 255, 255, 0.9);
-  pointer-events: none;
-  user-select: none;
-  letter-spacing: 0.02em;
-}
-
-.qw-center {
-  fill: var(--background-secondary);
-  stroke: var(--background-modifier-border);
-  stroke-width: 1px;
-  cursor: pointer;
-}
-
-.qw-center:hover {
-  fill: var(--background-modifier-hover);
-}
-
-.qw-center-icon {
-  font-size: 22px;
-  fill: var(--text-muted);
-  pointer-events: none;
-  user-select: none;
-}
-
 /* ── Dashboard ─────────────────────────────────────────────────────────────── */
 
 :root {
@@ -266,6 +178,21 @@
   letter-spacing: 0.12em;
   color: var(--qw-text-muted);
 }
+
+.qw-dash-radial-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--qw-purple-bright);
+  background: var(--qw-purple-dim);
+  border: 1px solid var(--qw-purple-border);
+  cursor: pointer;
+}
+.qw-dash-radial-btn:active { transform: scale(0.92); }
+.qw-dash-radial-btn svg { width: 15px; height: 15px; }
 
 /* ── Trash badge ── */
 
@@ -793,31 +720,6 @@
   border-color: var(--interactive-accent);
 }
 
-/* ── Radial entrance animation ──────────────────────────────────────────────── */
-
-/* Entrance animation */
-@keyframes qw-slice-in {
-  from {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.qw-svg .qw-slice-group {
-  opacity: 0;
-  transform-origin: center;
-  transform-box: fill-box;
-}
-
-.qw-svg--open .qw-slice-group {
-  animation: qw-slice-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
-}
-
 /* ── Right-handed mode ── */
 
 .qw-dash-modal--right .qw-dash-section-label {
@@ -847,3 +749,239 @@
 .qw-dash-modal--right .qw-dash-graph-footer {
   flex-direction: row-reverse;
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   RADIAL MENU V3 — faithful port of assets/obsidian_radial_v3.html
+   Three modes (breadcrumbs / commands / recents) on a single ring at r=110.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.qw-radial-container {
+  /* Token system, scoped to this modal */
+  --r-bg: #0d0d0f;
+  --r-purple: #7c5cbf;
+  --r-purple-bright: #9b7ce8;
+  --r-purple-dim: #3d2d6b;
+  --r-gold: #c9a84c;
+  --r-teal: #4ca8a0;
+  --r-rose: #bf5c7c;
+  --r-text-primary: #e8e8ec;
+  --r-text-muted: #3e3e48;
+  --r-mono: var(--font-monospace, 'JetBrains Mono', monospace);
+
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+/* Heavy blur overlay — editor stays faintly visible behind */
+.qw-radial-container .modal-bg {
+  opacity: 1 !important;
+  background: rgba(7, 7, 9, 0.9) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.qw-radial-modal {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: 340px !important;
+  max-width: 100vw !important;
+  padding: 0 !important;
+}
+
+.qw-radial-modal .modal-close-button { display: none; }
+
+.qw-radial {
+  position: relative;
+  width: 340px;
+  height: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--r-mono);
+  user-select: none;
+}
+
+/* ── Swipe hint ── */
+.qw-radial-swipe-hint {
+  position: absolute;
+  top: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+.qw-radial-swipe-bar { width: 36px; height: 4px; background: #444; border-radius: 2px; }
+.qw-radial-swipe-label {
+  font-size: 9px; color: var(--r-text-muted); letter-spacing: 0.1em;
+}
+
+/* ── Mode label ── */
+.qw-radial-mode-label {
+  position: absolute;
+  top: 36px; left: 50%; transform: translateX(-50%);
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--r-text-muted); opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ── Radial wrap ── */
+.qw-radial-wrap {
+  position: relative;
+  width: 340px; height: 340px;
+}
+.qw-radial-svg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* ── Ring buttons ── */
+.qw-radial-btn {
+  position: absolute;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 6px;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+.qw-radial-btn--ghost { opacity: 0.3; pointer-events: none; }
+.qw-radial-btn:active .qw-radial-btn-face { transform: scale(0.91); }
+
+.qw-radial-btn-face {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s ease, box-shadow 0.15s;
+  position: relative;
+}
+
+/* Slot variants */
+.qw-radial-slot-cmd .qw-radial-btn-face {
+  background: #1c1a28; border: 1.5px solid var(--r-purple-dim);
+}
+.qw-radial-slot-parent .qw-radial-btn-face {
+  background: rgba(201,168,76,0.07); border: 1.5px solid rgba(201,168,76,0.3);
+}
+.qw-radial-slot-child .qw-radial-btn-face {
+  background: rgba(76,168,160,0.07); border: 1.5px solid rgba(76,168,160,0.3);
+}
+.qw-radial-slot-sibling .qw-radial-btn-face {
+  background: rgba(191,92,124,0.07); border: 1.5px solid rgba(191,92,124,0.3);
+}
+.qw-radial-slot-recent .qw-radial-btn-face {
+  background: #16161e; border: 1.5px solid #2a2840;
+}
+.qw-radial-slot-overflow .qw-radial-btn-face {
+  background: rgba(76,168,160,0.04);
+  border: 1.5px dashed rgba(76,168,160,0.2);
+}
+.qw-radial-slot-empty .qw-radial-btn-face {
+  background: #131318; border: 1.5px solid #1e1e26;
+}
+
+.qw-radial-btn-icon {
+  font-size: 20px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--r-purple-bright);
+}
+.qw-radial-btn-icon svg { width: 20px; height: 20px; }
+
+/* Breadcrumb arrow + title inside button */
+.qw-radial-bc-stack {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.qw-radial-bc-arrow { font-size: 11px; display: block; margin-bottom: 1px; line-height: 1; }
+.qw-radial-bc-title {
+  font-size: 7px; white-space: nowrap; max-width: 48px;
+  overflow: hidden; text-overflow: ellipsis; line-height: 1.3; text-align: center;
+}
+.qw-radial-overflow-count { font-size: 14px; color: rgba(76,168,160,0.5); }
+
+.qw-radial-slot-parent .qw-radial-bc-arrow { color: var(--r-gold); }
+.qw-radial-slot-parent .qw-radial-bc-title { color: rgba(201,168,76,0.75); }
+.qw-radial-slot-child .qw-radial-bc-arrow { color: var(--r-teal); }
+.qw-radial-slot-child .qw-radial-bc-title { color: rgba(76,168,160,0.75); }
+.qw-radial-slot-sibling .qw-radial-bc-arrow { color: var(--r-rose); }
+.qw-radial-slot-sibling .qw-radial-bc-title { color: rgba(191,92,124,0.7); }
+.qw-radial-slot-overflow .qw-radial-bc-title { color: rgba(76,168,160,0.4); }
+
+/* Button labels below the circle */
+.qw-radial-btn-label {
+  font-size: 8.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  white-space: nowrap; color: #3e3e52; pointer-events: none;
+}
+.qw-radial-slot-cmd .qw-radial-btn-label { color: #42425a; }
+.qw-radial-slot-recent .qw-radial-btn-label {
+  font-size: 7.5px; color: #35354a; max-width: 64px; overflow: hidden; text-overflow: ellipsis;
+}
+.qw-radial-slot-parent .qw-radial-btn-label { color: rgba(201,168,76,0.4); }
+.qw-radial-slot-child .qw-radial-btn-label { color: rgba(76,168,160,0.4); }
+.qw-radial-slot-sibling .qw-radial-btn-label { color: rgba(191,92,124,0.4); }
+.qw-radial-slot-overflow .qw-radial-btn-label { color: rgba(76,168,160,0.25); }
+
+/* ── Center node (mode switcher) ── */
+.qw-radial-center {
+  position: absolute;
+  top: 170px; left: 170px;
+  transform: translate(-50%, -50%);
+  z-index: 10; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.qw-radial-center-outer {
+  width: 68px; height: 68px; border-radius: 50%;
+  border: 1px solid rgba(155,124,232,0.15);
+  display: flex; align-items: center; justify-content: center;
+  animation: qw-radial-pulse 3s ease-in-out infinite;
+}
+.qw-radial-center-mid {
+  width: 54px; height: 54px; border-radius: 50%;
+  background: #1a1428; border: 1.5px solid var(--r-purple);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 18px rgba(124,92,191,0.35), inset 0 0 10px rgba(124,92,191,0.08);
+}
+.qw-radial-center-inner {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--r-purple);
+  box-shadow: 0 0 10px rgba(124,92,191,0.7);
+  display: flex; align-items: center; justify-content: center;
+}
+.qw-radial-center-label {
+  font-size: 8px; font-weight: 600; color: #d4b8ff;
+  letter-spacing: 0.04em; line-height: 1; text-align: center;
+}
+@keyframes qw-radial-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.45; }
+  50% { transform: scale(1.05); opacity: 0.85; }
+}
+
+/* ── Context label ── */
+.qw-radial-context {
+  position: absolute;
+  bottom: 70px; left: 50%; transform: translateX(-50%);
+  text-align: center; pointer-events: none;
+}
+.qw-radial-context-title {
+  font-size: 12px; font-weight: 500; color: var(--r-text-primary); opacity: 0.65;
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.qw-radial-context-meta {
+  font-size: 10px; color: var(--r-text-muted); margin-top: 3px;
+}
+
+/* ── Mode key (bottom dots) ── */
+.qw-radial-mode-key {
+  position: absolute;
+  bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 20px; align-items: center;
+  opacity: 0.35;
+}
+.qw-radial-mode-key-item {
+  font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--r-text-muted);
+  display: flex; align-items: center; gap: 5px;
+  cursor: pointer;
+}
+.qw-radial-mode-key-item.active { color: var(--r-purple-bright); opacity: 1; }
+.qw-radial-mode-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }

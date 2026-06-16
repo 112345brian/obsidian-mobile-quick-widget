@@ -1,11 +1,11 @@
-import { Notice, Setting } from 'obsidian';
+import { Setting } from 'obsidian';
 import { PluginSettingsTabBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-settings-tab-base';
 
-import type { DashboardWidget, NewNoteFilenameFormat, PulseCard, QuickAction, SliceConfig } from './PluginSettings.ts';
+import type { DashboardWidget, NewNoteFilenameFormat, PulseCard, QuickAction, QuickActionIconType, RadialMode } from './PluginSettings.ts';
 import type { PluginTypes } from './PluginTypes.ts';
 
 import { CommandPickerModal } from './Modals/CommandPickerModal.ts';
-import { DASHBOARD_PRESETS, DEFAULT_PULSE_CARDS, PULSE_CARD_LABELS, QUICK_ACTION_DEFAULTS, WIDGET_LABELS, PluginSettings } from './PluginSettings.ts';
+import { DASHBOARD_PRESETS, DEFAULT_PULSE_CARDS, PULSE_CARD_LABELS, QUICK_ACTION_DEFAULTS, RADIAL_COMMAND_DEFAULTS, WIDGET_LABELS, PluginSettings } from './PluginSettings.ts';
 
 export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
   public override display(): void {
@@ -112,6 +112,42 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           });
       });
 
+    this.containerEl.createEl('h3', { text: 'Radial Menu' });
+
+    new Setting(this.containerEl)
+      .setName('Default mode')
+      .setDesc('Which mode the radial menu opens in.')
+      .addDropdown((d) => {
+        d.addOption('breadcrumbs', 'Breadcrumbs')
+          .addOption('commands', 'Commands')
+          .addOption('recents', 'Recents')
+          .setValue(s.radialDefaultMode ?? 'breadcrumbs')
+          .onChange((val) => {
+            s.radialDefaultMode = val as RadialMode;
+            void this.plugin.settingsManager.saveToFile();
+          });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Remember last mode')
+      .setDesc('Reopen the radial menu in whatever mode you last used, instead of the default.')
+      .addToggle((t) => {
+        t.setValue(s.radialRememberLast ?? false).onChange((val) => {
+          s.radialRememberLast = val;
+          void this.plugin.settingsManager.saveToFile();
+        });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Connect radial & dashboard')
+      .setDesc('Swipe down on the radial menu to open the dashboard, and show a button on the dashboard to return to the radial.')
+      .addToggle((t) => {
+        t.setValue(s.connectSurfaces ?? true).onChange((val) => {
+          s.connectSurfaces = val;
+          void this.plugin.settingsManager.saveToFile();
+        });
+      });
+
     new Setting(this.containerEl)
       .setName('Recently touched count')
       .setDesc('Number of files to show in the Touched list.')
@@ -169,129 +205,31 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
     this.renderPulseCardsSection(s);
     this.renderQuickActionsSection(s);
 
-    this.containerEl.createEl('h3', { text: 'Slices' });
-    this.containerEl.createEl('p', {
-      cls: 'setting-item-description',
-      text: 'Angles use SVG screen coordinates: 0°=right, 90°=bottom, 180°=left, 270°=top. Default layout: bottom half (0→180) = cancel, top-left (180→270) = home, top-right (270→360) = new note.',
-    });
-
-    const slices = s.slices as SliceConfig[];
-    for (let i = 0; i < slices.length; i++) {
-      this.renderSlice(slices, i);
-    }
-
-    new Setting(this.containerEl)
-      .addButton((btn) => {
-        btn.setButtonText('Add slice').setCta().onClick(() => {
-          slices.push({
-            label: 'New Slice',
-            icon: '★',
-            action: 'cancel',
-            color: '#888888',
-            startAngle: 0,
-            endAngle: 90,
-          });
-          void this.plugin.settingsManager.saveToFile();
-          this.display();
-        });
-      })
-      .addButton((btn) => {
-        btn.setButtonText('Reset to defaults').onClick(() => {
-          (this.plugin.settings as PluginSettings).slices = new PluginSettings().slices;
-          void this.plugin.settingsManager.saveToFile();
-          this.display();
-        });
-      });
+    this.renderRadialCommandsSection(s);
   }
 
-  private renderSlice(slices: SliceConfig[], i: number): void {
-    const slice = slices[i];
-    if (!slice) return;
+  private renderRadialCommandsSection(s: PluginSettings): void {
+    this.containerEl.createEl('h3', { text: 'Radial Commands' });
+    this.containerEl.createEl('p', {
+      cls: 'setting-item-description',
+      text: 'The six command slots shown in the radial menu\'s Commands mode, in clockwise order from the top: 12, 2, 4, 6, 8, 10 o\'clock. Icon may be a single glyph (✦) or a Lucide icon name.',
+    });
 
-    const save = (): void => {
-      this.validateAngles(slices);
-      void this.plugin.settingsManager.saveToFile();
-    };
-
-    this.containerEl.createEl('h4', { text: `Slice ${i + 1}: ${slice.label}` });
-
-    new Setting(this.containerEl)
-      .setName('Label')
-      .addText((t) => { t.setValue(slice.label).onChange((v) => { slice.label = v; save(); }); });
-
-    new Setting(this.containerEl)
-      .setName('Icon')
-      .setDesc('Emoji or single character')
-      .addText((t) => { t.setValue(slice.icon).onChange((v) => { slice.icon = v; save(); }); });
-
-    new Setting(this.containerEl)
-      .setName('Action')
-      .addDropdown((dd) => {
-        dd
-          .addOption('cancel', 'Cancel (close menu)')
-          .addOption('dashboard', 'Open dashboard')
-          .addOption('homepage', 'Open homepage')
-          .addOption('new-note', 'Create new note')
-          .addOption('command', 'Run Obsidian command')
-          .setValue(slice.action)
-          .onChange((v) => {
-            slice.action = v as SliceConfig['action'];
-            save();
-            this.display();
-          });
-      });
-
-    if (slice.action === 'command') {
-      new Setting(this.containerEl)
-        .setName('Command')
-        .setDesc(slice.commandId ? `ID: ${slice.commandId}` : 'No command selected')
-        .addButton((btn) => {
-          btn
-            .setButtonText(slice.commandId ? 'Change…' : 'Choose command…')
-            .onClick(() => {
-              new CommandPickerModal(this.app, (cmd) => {
-                slice.commandId = cmd.id;
-                save();
-                this.display();
-              }).open();
-            });
-        });
+    const commands = s.radialCommands as QuickAction[];
+    const clock = ['12 o\'clock (top)', '2 o\'clock', '4 o\'clock', '6 o\'clock (bottom)', '8 o\'clock', '10 o\'clock'];
+    for (let i = 0; i < commands.length; i++) {
+      this.containerEl.createEl('h4', { text: `Slot ${clock[i] ?? i + 1}` });
+      this.renderQuickAction(s, commands, i, { removable: false, showHeading: false });
     }
 
     new Setting(this.containerEl)
-      .setName('Angles')
-      .setDesc('Start angle → end angle in degrees')
-      .addText((t) => {
-        t
-          .setPlaceholder('Start')
-          .setValue(String(slice.startAngle))
-          .onChange((v) => {
-            const n = Number(v);
-            if (!isNaN(n)) { slice.startAngle = n; save(); }
-          });
-      })
-      .addText((t) => {
-        t
-          .setPlaceholder('End')
-          .setValue(String(slice.endAngle))
-          .onChange((v) => {
-            const n = Number(v);
-            if (!isNaN(n)) { slice.endAngle = n; save(); }
-          });
-      });
-
-    new Setting(this.containerEl)
-      .setName('Color')
-      .addColorPicker((cp) => { cp.setValue(slice.color).onChange((v) => { slice.color = v; save(); }); })
       .addButton((btn) => {
-        btn.setButtonText('Remove').setWarning().onClick(() => {
-          slices.splice(i, 1);
+        btn.setButtonText('Reset to defaults').onClick(() => {
+          s.radialCommands = RADIAL_COMMAND_DEFAULTS.map((c) => ({ ...c }));
           void this.plugin.settingsManager.saveToFile();
           this.display();
         });
       });
-
-    this.containerEl.createEl('hr');
   }
 
   private renderDashboardSection(s: PluginSettings): void {
@@ -451,13 +389,19 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
       });
   }
 
-  private renderQuickAction(_s: PluginSettings, actions: QuickAction[], i: number): void {
+  private renderQuickAction(
+    _s: PluginSettings,
+    actions: QuickAction[],
+    i: number,
+    opts: { removable?: boolean; showHeading?: boolean } = {},
+  ): void {
+    const { removable = true, showHeading = true } = opts;
     const action = actions[i];
     if (!action) return;
 
     const save = (): void => { void this.plugin.settingsManager.saveToFile(); };
 
-    this.containerEl.createEl('h4', { text: `Action ${i + 1}: ${action.label}` });
+    if (showHeading) this.containerEl.createEl('h4', { text: `Action ${i + 1}: ${action.label}` });
 
     new Setting(this.containerEl)
       .setName('Label')
@@ -465,8 +409,19 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
 
     new Setting(this.containerEl)
       .setName('Icon')
-      .setDesc('Lucide icon name — browse at lucide.dev')
-      .addText((t) => { t.setPlaceholder('zap').setValue(action.icon).onChange((v) => { action.icon = v; save(); }); });
+      .setDesc(action.iconType === 'glyph' ? 'Literal glyph/text, e.g. ✦' : 'Lucide icon name — browse at lucide.dev')
+      .addText((t) => { t.setPlaceholder('zap').setValue(action.icon).onChange((v) => { action.icon = v; save(); }); })
+      .addDropdown((dd) => {
+        dd
+          .addOption('lucide', 'Lucide icon')
+          .addOption('glyph', 'Literal glyph')
+          .setValue(action.iconType ?? 'lucide')
+          .onChange((v) => {
+            action.iconType = v as QuickActionIconType;
+            save();
+            this.display();
+          });
+      });
 
     new Setting(this.containerEl)
       .setName('Action type')
@@ -521,36 +476,18 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
         });
     }
 
-    new Setting(this.containerEl)
-      .addButton((btn) => {
-        btn.setButtonText('Remove').setWarning().onClick(() => {
-          actions.splice(i, 1);
-          void this.plugin.settingsManager.saveToFile();
-          this.display();
+    if (removable) {
+      new Setting(this.containerEl)
+        .addButton((btn) => {
+          btn.setButtonText('Remove').setWarning().onClick(() => {
+            actions.splice(i, 1);
+            void this.plugin.settingsManager.saveToFile();
+            this.display();
+          });
         });
-      });
+    }
 
     this.containerEl.createEl('hr');
   }
 
-  private validateAngles(slices: SliceConfig[]): void {
-    for (const slice of slices) {
-      if (slice.startAngle >= slice.endAngle) {
-        new Notice(`Slice "${slice.label}": start angle must be less than end angle.`);
-        return;
-      }
-    }
-
-    for (let i = 0; i < slices.length; i++) {
-      for (let j = i + 1; j < slices.length; j++) {
-        const a = slices[i];
-        const b = slices[j];
-        if (!a || !b) continue;
-        if (a.startAngle < b.endAngle && b.startAngle < a.endAngle) {
-          new Notice(`Slices "${a.label}" and "${b.label}" overlap. Adjust their angles.`);
-          return;
-        }
-      }
-    }
-  }
 }

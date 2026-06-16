@@ -1,12 +1,16 @@
 import type { App, TFile } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
-import { Modal, Notice, setIcon } from 'obsidian';
+import { Modal, setIcon } from 'obsidian';
 
 import type { PulseCard, PluginSettings, QuickAction } from '../PluginSettings.ts';
+import type { NeighborRelation } from '../breadcrumbs.ts';
 
+import { getBCGraph, getFrontmatterLinkTargets, relColor, REL_PALETTE, resolveBCRelations } from '../breadcrumbs.ts';
 import { createNote } from '../createNote.ts';
-import { AppendPromptModal } from './AppendPromptModal.ts';
+import { executeQuickAction } from '../quickActions.ts';
+import { getRecentFiles, isExcluded } from '../recents.ts';
+import { truncate } from '../text.ts';
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -56,6 +60,14 @@ function extractTailPreview(raw: string): string {
 }
 
 
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function noteTags(file: TFile, app: App): string[] {
   const cache = app.metadataCache.getFileCache(file);
   const inline = (cache?.tags ?? []).map((t) => t.tag);
@@ -70,10 +82,6 @@ interface TrashApi {
   openTriage(): Promise<void>;
 }
 
-interface ContinuePlugin {
-  openedLog: string[];
-}
-
 function getTrashApi(app: App): TrashApi | null {
   const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
     .plugins?.plugins?.['trash-collection'];
@@ -81,108 +89,6 @@ function getTrashApi(app: App): TrashApi | null {
   const api = (plugin as { api?: unknown }).api;
   if (!api || typeof (api as TrashApi).getCandidates !== 'function') return null;
   return api as TrashApi;
-}
-
-function getContinuePlugin(app: App): ContinuePlugin | null {
-  const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
-    .plugins?.plugins?.['obsidian-continue'];
-  if (!plugin || !Array.isArray((plugin as ContinuePlugin).openedLog)) return null;
-  return plugin as ContinuePlugin;
-}
-
-// ── Breadcrumbs plugin shim (for parent lookup) ──────────────────────────────
-
-interface BCGraph {
-  has_node(path: string): boolean;
-  get_filtered_outgoing_edges(path: string): { target_id: string; attr: { field?: string; dir?: string; direction?: string } }[];
-}
-
-function getBCGraph(app: App): BCGraph | null {
-  const p = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
-    .plugins?.plugins?.['breadcrumbs'] as { graph?: BCGraph } | undefined;
-  return p?.graph ?? null;
-}
-
-// ── Bread-trail / Breadcrumbs relation resolver ──────────────────────────────
-// Reads frontmatter links directly — no plugin API dependency.
-// Bread-trail uses keys: up, up.*, down, down.*, next, next.*, prev, prev.*
-
-type BCRel = 'parent' | 'child' | 'next' | 'prev' | 'sibling';
-
-interface NeighborRelation {
-  rel: BCRel;
-  siblingParent?: string | undefined;
-}
-
-function getFrontmatterLinkTargets(app: App, file: TFile, keyPrefix: string): Set<string> {
-  const links = app.metadataCache.getFileCache(file)?.frontmatterLinks ?? [];
-  const result = new Set<string>();
-  for (const link of links) {
-    if (link.key === keyPrefix || link.key.startsWith(keyPrefix + '.')) {
-      const target = app.metadataCache.getFirstLinkpathDest(link.link, file.path);
-      if (target) result.add(target.path);
-    }
-  }
-  return result;
-}
-
-function resolveBCRelations(app: App, center: TFile, neighborPaths: string[]): Map<string, NeighborRelation> {
-  const result = new Map<string, NeighborRelation>();
-
-  // Center's own up/down/next/prev targets
-  const centerParents = getFrontmatterLinkTargets(app, center, 'up');
-  const centerChildren = getFrontmatterLinkTargets(app, center, 'down');
-  const centerNext = getFrontmatterLinkTargets(app, center, 'next');
-  const centerPrev = getFrontmatterLinkTargets(app, center, 'prev');
-
-  for (const path of neighborPaths) {
-    const file = app.vault.getFileByPath(path);
-
-    if (centerParents.has(path)) {
-      result.set(path, { rel: 'parent' });
-      continue;
-    }
-    if (centerChildren.has(path)) {
-      result.set(path, { rel: 'child' });
-      continue;
-    }
-    if (centerNext.has(path)) {
-      result.set(path, { rel: 'next' });
-      continue;
-    }
-    if (centerPrev.has(path)) {
-      result.set(path, { rel: 'prev' });
-      continue;
-    }
-
-    if (file) {
-      // If neighbor has an `up` link pointing to center → it's a child
-      const neighborParents = getFrontmatterLinkTargets(app, file, 'up');
-      if (neighborParents.has(center.path)) {
-        result.set(path, { rel: 'child' });
-        continue;
-      }
-      // If center has an `up` link pointing to center's parent,
-      // and neighbor also has an `up` link to that same parent → sibling
-      if (centerParents.size > 0) {
-        for (const parentPath of centerParents) {
-          if (neighborParents.has(parentPath)) {
-            const parentFile = app.vault.getFileByPath(parentPath);
-            result.set(path, { rel: 'sibling', siblingParent: parentFile?.basename });
-            break;
-          }
-        }
-        if (result.has(path)) continue;
-      }
-      // If neighbor's next/prev points to center, or center's next/prev resolves from neighbor
-      const neighborNext = getFrontmatterLinkTargets(app, file, 'next');
-      const neighborPrev = getFrontmatterLinkTargets(app, file, 'prev');
-      if (neighborNext.has(center.path)) { result.set(path, { rel: 'prev' }); continue; }
-      if (neighborPrev.has(center.path)) { result.set(path, { rel: 'next' }); continue; }
-    }
-  }
-
-  return result;
 }
 
 // ── Modal ────────────────────────────────────────────────────────────────────
@@ -294,6 +200,16 @@ export class DashboardModal extends Modal {
     const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
     dateRow.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
 
+    // Reverse hand-off to the radial menu (decoupled via command dispatch).
+    if (this.settings.connectSurfaces) {
+      const radialBtn = dateRow.createEl('div', { cls: 'qw-dash-radial-btn', attr: { 'aria-label': 'Open radial menu' } });
+      setIcon(radialBtn, 'compass');
+      radialBtn.addEventListener('click', () => {
+        this.close();
+        this.app.commands.executeCommandById('mobile-quick-widget:open-radial-menu');
+      });
+    }
+
     const cards = (this.settings.pulseCards ?? []).filter((c) => c.enabled);
     if (cards.length === 0) return;
 
@@ -343,7 +259,7 @@ export class DashboardModal extends Modal {
         break;
       }
       case 'modified-today': {
-        const count = ctx.allFiles.filter((f) => f.stat.mtime >= ctx.today.getTime()).length;
+        const count = ctx.allFiles.filter((f) => this.getModifiedTime(f) >= ctx.today.getTime()).length;
         const el = row.createEl('div', { cls: 'qw-dash-pulse-card' });
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Modified' });
         el.createEl('div', { cls: 'qw-dash-pulse-value', text: String(count) });
@@ -402,9 +318,10 @@ export class DashboardModal extends Modal {
   private getModifiedTime(file: TFile): number {
     const field = this.settings.modifiedDateField;
     if (field) {
-      const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-      const val = fm?.[field] as string | undefined;
-      if (val) {
+      const val = this.app.metadataCache.getFileCache(file)?.frontmatter?.[field] as unknown;
+      if (val instanceof Date) return val.getTime();
+      if (typeof val === 'number' && val > 1e11) return val; // looks like a ms epoch timestamp
+      if (typeof val === 'string') {
         const t = Date.parse(val);
         if (!isNaN(t)) return t;
       }
@@ -439,6 +356,14 @@ export class DashboardModal extends Modal {
       tabTouched.classList.toggle('qw-dash-segment-tab--active', !showModified);
       tabModified.classList.toggle('qw-dash-segment-tab--active', showModified);
 
+      // Build backlink counts once per render instead of rescanning per row
+      const backlinkCounts = new Map<string, number>();
+      for (const links of Object.values(this.app.metadataCache.resolvedLinks)) {
+        for (const target of Object.keys(links)) {
+          backlinkCounts.set(target, (backlinkCounts.get(target) ?? 0) + 1);
+        }
+      }
+
       for (const file of files) {
         const row = listEl.createEl('div', { cls: 'qw-dash-note-row' });
         const meta = row.createEl('div', { cls: 'qw-dash-note-meta' });
@@ -459,10 +384,7 @@ export class DashboardModal extends Modal {
         });
 
         const tags = noteTags(file, this.app);
-        let backlinkCount = 0;
-        for (const links of Object.values(this.app.metadataCache.resolvedLinks)) {
-          if (links[file.path]) backlinkCount++;
-        }
+        const backlinkCount = backlinkCounts.get(file.path) ?? 0;
         const detail = meta.createEl('div', { cls: 'qw-dash-note-detail' });
         if (backlinkCount > 0) detail.createEl('span', { cls: 'qw-dash-note-links', text: `← ${backlinkCount}` });
         for (const tag of tags) detail.createEl('span', { cls: 'qw-dash-note-tag', text: tag });
@@ -486,47 +408,20 @@ export class DashboardModal extends Modal {
   }
 
   private renderTasks(root: HTMLElement): void {
-    const allFiles = this.app.vault.getMarkdownFiles();
-    type TaskItem = { text: string; src: string; done: boolean };
-    const tasks: TaskItem[] = [];
-
-    for (const file of allFiles) {
-      const cache = this.app.metadataCache.getFileCache(file);
-      for (const li of cache?.listItems ?? []) {
-        if (li.task === ' ' || li.task === 'x') {
-          tasks.push({ text: li.task === 'x' ? '' : '', src: file.basename, done: li.task === 'x' });
-        }
-      }
-    }
-
-    // Re-derive with actual text from cache position — use sections approach
-    const openTasks: { text: string; src: string; path: string }[] = [];
-    for (const file of allFiles) {
-      const cache = this.app.metadataCache.getFileCache(file);
-      for (const li of cache?.listItems ?? []) {
-        if (li.task !== ' ') continue;
-        openTasks.push({ text: '', src: file.basename, path: file.path });
-      }
-    }
-
-    if (openTasks.length === 0) return;
+    const filesWithOpenTasks = this.app.vault.getMarkdownFiles().filter((file) =>
+      (this.app.metadataCache.getFileCache(file)?.listItems ?? []).some((li) => li.task === ' '),
+    );
+    if (filesWithOpenTasks.length === 0) return;
 
     root.createEl('div', { cls: 'qw-dash-section-label', text: 'OPEN TASKS' });
     const card = root.createEl('div', { cls: 'qw-dash-task-card' });
-
-    // We don't have the raw text from cache listItems (no position→text lookup without file read),
-    // so read files async — but renderTasks is sync. Render placeholders from path.
-    // Instead use a simpler approach: scan vault files for task lines via cached content
-    card.createEl('div', { cls: 'qw-dash-task-loading', text: `${openTasks.length} open tasks` });
+    card.createEl('div', { cls: 'qw-dash-task-loading', text: 'Loading…' });
 
     void (async () => {
       card.empty();
       let count = 0;
-      for (const file of allFiles) {
+      for (const file of filesWithOpenTasks) {
         if (count >= 10) break;
-        const cache = this.app.metadataCache.getFileCache(file);
-        const hasOpen = (cache?.listItems ?? []).some((li) => li.task === ' ');
-        if (!hasOpen) continue;
         try {
           const raw = await this.app.vault.cachedRead(file);
           const lines = raw.split('\n');
@@ -568,7 +463,7 @@ export class DashboardModal extends Modal {
 
     const card = root.createEl('div', { cls: 'qw-dash-graph-card' });
     const canvas = card.createEl('div', { cls: 'qw-dash-graph-canvas' });
-    const relations = resolveBCRelations(this.app, centerFile, neighborPaths);
+    const relations = resolveBCRelations(this.app, centerFile, neighborPaths, this.settings.breadcrumbField || 'up');
     const attachListeners = (expanded: boolean): void => {
       canvas.innerHTML = this.buildGraphSvg(centerFile, neighborPaths.slice(0, expanded ? 20 : 10), expanded, relations);
 
@@ -669,11 +564,12 @@ export class DashboardModal extends Modal {
         const tip = rel === 'next' ? `${(mx + ux * 6).toFixed(1)},${(my + uy * 6).toFixed(1)}` : `${(mx - ux * 6).toFixed(1)},${(my - uy * 6).toFixed(1)}`;
         const w1 = rel === 'next' ? `${(mx - ux * 4 + px).toFixed(1)},${(my - uy * 4 + py).toFixed(1)}` : `${(mx + ux * 4 + px).toFixed(1)},${(my + uy * 4 + py).toFixed(1)}`;
         const w2 = rel === 'next' ? `${(mx - ux * 4 - px).toFixed(1)},${(my - uy * 4 - py).toFixed(1)}` : `${(mx + ux * 4 - px).toFixed(1)},${(my + uy * 4 - py).toFixed(1)}`;
-        return `<line x1="${cx}" y1="${cy}" x2="${nb.x.toFixed(1)}" y2="${nb.y.toFixed(1)}" stroke="#3a3a55" stroke-width="1" opacity="0.8"/>` +
-               `<polygon points="${tip} ${w1} ${w2}" fill="#5a5a7a" opacity="0.7"/>`;
+        return `<line x1="${cx}" y1="${cy}" x2="${nb.x.toFixed(1)}" y2="${nb.y.toFixed(1)}" stroke="${REL_PALETTE.rose}" stroke-width="1" opacity="0.45"/>` +
+               `<polygon points="${tip} ${w1} ${w2}" fill="${REL_PALETTE.rose}" opacity="0.6"/>`;
       }
-      const stroke = rel === 'parent' ? '#4a6a9f' : rel === 'child' ? '#5a4a7f' : rel === 'sibling' ? '#3a5a4a' : '#2e2e3a';
-      return `<line x1="${cx}" y1="${cy}" x2="${nb.x.toFixed(1)}" y2="${nb.y.toFixed(1)}" stroke="${stroke}" stroke-width="1" opacity="0.8"/>`;
+      const stroke = rel ? relColor(rel).node : '#2e2e3a';
+      const op = rel ? 0.45 : 0.8;
+      return `<line x1="${cx}" y1="${cy}" x2="${nb.x.toFixed(1)}" y2="${nb.y.toFixed(1)}" stroke="${stroke}" stroke-width="1" opacity="${op}"/>`;
     }).join('');
 
     // Labels — wrap up to 3 lines of ~12 chars each
@@ -739,21 +635,20 @@ export class DashboardModal extends Modal {
 
     const nodes = labels.map((lb) => {
       const rel = lb.info?.rel;
-      const nodeColor = rel === 'parent' ? '#4a6aaf' : rel === 'child' ? '#7c5cbf' : rel === 'next' || rel === 'prev' ? '#5a5a8f' : rel === 'sibling' ? '#3a6a4a' : '#3a3a50';
-      const labelColor = rel === 'parent' ? '#7baeff' : rel === 'child' ? '#c9a8ff' : rel === 'next' || rel === 'prev' ? '#9898d0' : rel === 'sibling' ? '#80c880' : '#9b7ce8';
+      const { node: nodeColor, label: labelColor } = relColor(rel);
       const sibParent = lb.info?.siblingParent;
       const subLabel = rel === 'sibling' && sibParent
-        ? `<text x="${lb.nx.toFixed(1)}" y="${(lb.ny - 8).toFixed(1)}" text-anchor="middle" fill="#4a7a4a" font-size="5.5" font-family="monospace" opacity="0.7">${sibParent.slice(0, 10)}</text>`
+        ? `<text x="${lb.nx.toFixed(1)}" y="${(lb.ny - 8).toFixed(1)}" text-anchor="middle" fill="${REL_PALETTE.rose}" font-size="5.5" font-family="monospace" opacity="0.6">${escapeXml(sibParent.slice(0, 10))}</text>`
         : '';
       const textEls = lb.lines.map((line, li) =>
-        `<text x="${lb.x.toFixed(1)}" y="${(lb.y + li * LINE_H).toFixed(1)}" text-anchor="middle" fill="${labelColor}" font-size="7" font-family="monospace" opacity="0.85">${line}</text>`
+        `<text x="${lb.x.toFixed(1)}" y="${(lb.y + li * LINE_H).toFixed(1)}" text-anchor="middle" fill="${labelColor}" font-size="7" font-family="monospace" opacity="0.85">${escapeXml(line)}</text>`
       ).join('');
       const pad = 3;
       const rectX = (lb.x - lb.w / 2 - pad).toFixed(1);
       const rectY = (lb.y - LINE_H + 1 - pad).toFixed(1);
       const rectW = (lb.w + pad * 2).toFixed(1);
       const rectH = (lb.totalH + pad * 2).toFixed(1);
-      return `<g data-path="${lb.path}" style="cursor:pointer">
+      return `<g data-path="${escapeXml(lb.path)}" style="cursor:pointer">
         <rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" fill="transparent"/>
         <circle cx="${lb.nx.toFixed(1)}" cy="${lb.ny.toFixed(1)}" r="8" fill="transparent"/>
         ${subLabel}
@@ -762,7 +657,7 @@ export class DashboardModal extends Modal {
       </g>`;
     }).join('');
 
-    const centerLabel = center.basename.length > 20 ? center.basename.slice(0, 20) + '…' : center.basename;
+    const centerLabel = escapeXml(truncate(center.basename, 20));
 
     return `<svg viewBox="0 0 343 ${viewH}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
       <g>${edges}</g>
@@ -864,9 +759,7 @@ export class DashboardModal extends Modal {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   private isExcluded(file: TFile): boolean {
-    return (this.settings.continueExcluded ?? []).some((rule) =>
-      rule.endsWith('/') ? file.path.startsWith(rule) : file.path === rule,
-    );
+    return isExcluded(file, this.settings.continueExcluded ?? []);
   }
 
   private getParentNames(file: TFile): string[] {
@@ -886,75 +779,15 @@ export class DashboardModal extends Modal {
     }
     // Fall back to frontmatter links
     const field = this.settings.breadcrumbField || 'up';
-    const links = this.app.metadataCache.getFileCache(file)?.frontmatterLinks ?? [];
-    const names: string[] = [];
-    for (const link of links) {
-      if (link.key === field || link.key.startsWith(field + '.')) {
-        const target = this.app.metadataCache.getFirstLinkpathDest(link.link, file.path);
-        names.push(target?.basename ?? link.link);
-      }
-    }
-    return names;
+    const targets = getFrontmatterLinkTargets(this.app, file, field);
+    return Array.from(targets, (path) => this.app.vault.getFileByPath(path)?.basename ?? path);
   }
 
   private getRecentFiles(): TFile[] {
-    const max = this.settings.recentListCount ?? 15;
-    const activePath = this.app.workspace.getActiveFile()?.path;
-    const continuePlug = getContinuePlugin(this.app);
-    const paths =
-      continuePlug && continuePlug.openedLog.length > 0
-        ? continuePlug.openedLog
-        : this.app.workspace.getLastOpenFiles();
-    return paths
-      .map((p) => this.app.vault.getFileByPath(p))
-      .filter((f): f is TFile => f !== null && f.path !== activePath && !this.isExcluded(f))
-      .slice(0, max);
+    return getRecentFiles(this.app, this.settings.continueExcluded ?? [], this.settings.recentListCount ?? 15);
   }
 
   private async handleQuickAction(action: ReadonlyDeep<QuickAction>): Promise<void> {
-    switch (action.action) {
-      case 'new-note': {
-        this.close();
-        const file = await createNote(this.app, this.settings);
-        await this.app.workspace.getMostRecentLeaf()?.openFile(file);
-        break;
-      }
-      case 'homepage': {
-        this.close();
-        const target = this.settings.homePath;
-        if (target) {
-          const file = this.app.vault.getFileByPath(target);
-          if (file) { await this.app.workspace.getMostRecentLeaf()?.openFile(file); return; }
-        }
-        try {
-          if (this.app.commands.findCommand('homepage:open')) {
-            this.app.commands.executeCommandById('homepage:open');
-          } else {
-            new Notice('No home note configured.');
-          }
-        } catch { new Notice('No home note configured.'); }
-        break;
-      }
-      case 'command': {
-        this.close();
-        if (action.commandId) this.app.commands.executeCommandById(action.commandId);
-        break;
-      }
-      case 'append-to-note': {
-        const notePath = action.notePath;
-        if (!notePath) { new Notice('No note path configured for this action.'); return; }
-        const template = action.appendTemplate || '{{text}}';
-        new AppendPromptModal(this.app, action.label, async (text) => {
-          const file = this.app.vault.getFileByPath(notePath);
-          if (!file) { new Notice(`Note not found: ${notePath}`); return; }
-          const line = template.replace('{{text}}', text);
-          const content = await this.app.vault.read(file);
-          const sep = content.endsWith('\n') ? '' : '\n';
-          await this.app.vault.modify(file, content + sep + line + '\n');
-          new Notice(`Added to ${file.basename}`);
-        }).open();
-        break;
-      }
-    }
+    await executeQuickAction(this.app, this.settings, action, () => this.close());
   }
 }
