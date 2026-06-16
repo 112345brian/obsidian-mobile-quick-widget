@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — 2026-06-16
+
+### Fixed
+- Command palette entries now register on desktop as well as mobile, so "Open radial menu" and "Open dashboard" are visible when configuring or debugging the plugin.
+
+---
+
 ## 0.2.0 — 2026-06-16
 
 ### Added

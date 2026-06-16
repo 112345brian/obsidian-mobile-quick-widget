@@ -1,6 +1,6 @@
 {
   "name": "mobile-quick-widget",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Radial pie menu for Obsidian mobile — assign to swipe-up and tap a slice to run a command.",
   "keywords": [],
   "license": "MIT",
