@@ -38,7 +38,7 @@ export type DashboardWidgetType = string;
 // (Note: vault "trash"/needs-review surfaces as a Pulse Card, not a
 // dashboard widget — there's no 'trash' widget type.)
 export const BUILTIN_DASHBOARD_WIDGET_TYPES: DashboardWidgetType[] = [
-  'radial', 'graph', 'continue', 'tasks', 'new-note', 'pomodoro', 'git',
+  'radial', 'graph', 'continue', 'tasks', 'new-note', 'pomodoro',
 ];
 
 export interface DashboardWidget {
@@ -116,12 +116,13 @@ export function normalizeDashboardWidgets(
 
 export type NewNoteFilenameFormat = 'untitled' | 'zettelkasten' | 'custom';
 
-export type PulseCardType = 'daily-note' | 'modified-today' | 'vault' | 'trash' | 'quick-action' | 'homepage';
+export type PulseCardType = 'daily-note' | 'modified-today' | 'vault' | 'trash' | 'quick-action' | 'homepage' | 'git' | 'streak' | 'inbox' | 'pomodoro';
 
 export interface PulseCard {
   type: PulseCardType;
   enabled: boolean;
   quickAction?: QuickAction; // only for type === 'quick-action'
+  size?: 1 | 2 | 3; // column span in the 3-col pulse grid, default 1
 }
 
 export const PULSE_CARD_LABELS: Record<PulseCardType, string> = {
@@ -131,6 +132,10 @@ export const PULSE_CARD_LABELS: Record<PulseCardType, string> = {
   'trash': 'Trash (conditional)',
   'quick-action': 'Quick Action',
   'homepage': 'Homepage',
+  'git': 'Git Status (conditional)',
+  'streak': 'Streak',
+  'inbox': 'Inbox (conditional)',
+  'pomodoro': 'Pomodoro (conditional)',
 };
 
 export const DEFAULT_PULSE_CARDS: PulseCard[] = [
@@ -165,6 +170,12 @@ export class PluginSettings {
   public connectSurfaces = true;
   public radialCommands: QuickAction[] = RADIAL_COMMAND_DEFAULTS.map((c) => ({ ...c }));
   public dashboardSidebarSide: 'left' | 'right' = 'right';
+  public gitPulseCardAction: 'sync' | 'menu' = 'sync';
+  public cardShowTags = true;
+  public cardShowPreview = true;
+  public cardShowBacklinks = true;
+  public cardFrontmatterFields: string[] = [];
+  public inboxPath = '';
 }
 
 export type RadialMode = 'breadcrumbs' | 'commands' | 'recents';

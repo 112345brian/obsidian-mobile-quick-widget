@@ -1,7 +1,6 @@
 import type { DashboardWidgetDefinition } from '../DashboardWidgetApi.ts';
 
 import { continueWidget } from './continue.ts';
-import { gitWidget } from './git.ts';
 import { graphWidget } from './graph.ts';
 import { moreActionsWidget } from './moreActions.ts';
 import { pomodoroWidget } from './pomodoro.ts';
@@ -21,5 +20,4 @@ export const BUILTIN_WIDGETS: DashboardWidgetDefinition[] = [
   tasksWidget,
   moreActionsWidget,
   pomodoroWidget,
-  gitWidget,
 ];

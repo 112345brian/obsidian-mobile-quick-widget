@@ -1,7 +1,7 @@
 import type { App, TFile } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
-import { setIcon } from 'obsidian';
+import { Menu, setIcon } from 'obsidian';
 
 import type { DashboardWidget, PulseCard, PluginSettings, QuickAction } from './PluginSettings.ts';
 import type { DashboardWidgetContext, DashboardWidgetRegistry } from './DashboardWidgetApi.ts';
@@ -11,6 +11,7 @@ import { getExternalPlugin } from './externalPlugin.ts';
 import { vibrate } from './haptics.ts';
 import { BUILTIN_DASHBOARD_WIDGET_TYPES, normalizeDashboardWidgets } from './PluginSettings.ts';
 import { executeQuickAction } from './quickActions.ts';
+import { radialLauncherWidget } from './widgets/radialLauncher.ts';
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -25,6 +26,47 @@ function headerDate(): string {
 interface TrashApi {
   getCandidates(): TFile[];
   openTriage(): Promise<void>;
+}
+
+interface TimerStore {
+  running: boolean;
+  mode: 'WORK' | 'BREAK';
+  remained: { millis: number; human: string };
+}
+
+interface PomodoroTimer {
+  subscribe(run: (state: TimerStore) => void): () => void;
+}
+
+function getPomodoroTimer(app: App): PomodoroTimer | null {
+  const plugin = getExternalPlugin<{ timer?: PomodoroTimer }>(app, 'pomodoro-timer');
+  const timer = plugin?.timer;
+  if (!timer || typeof timer.subscribe !== 'function') return null;
+  return timer;
+}
+
+function computeStreak(files: TFile[], today: Date): number {
+  const days = new Set<string>();
+  for (const file of files) {
+    const d = new Date(file.stat.mtime);
+    days.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+  }
+  let count = 0;
+  const cursor = new Date(today);
+  while (true) {
+    const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
+    if (!days.has(key)) break;
+    count++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return count;
+}
+
+function countInboxFiles(app: App, inboxPath: string): number {
+  if (!inboxPath) return 0;
+  return app.vault.getMarkdownFiles().filter(
+    (f) => f.path.startsWith(inboxPath + '/') || f.parent?.path === inboxPath
+  ).length;
 }
 
 function getTrashApi(app: App): TrashApi | null {
@@ -121,11 +163,12 @@ export class DashboardContent {
     const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.widgetRegistry.ids()])];
     const widgets = normalizeDashboardWidgets((this.settings.dashboardWidgets ?? []) as readonly DashboardWidget[], knownIds);
 
-    this.renderTodaySection(inner);
-
     const ctx = this.widgetContext();
+    this.renderTodaySection(inner, ctx);
+
     for (const widget of widgets) {
       if (!widget.enabled) continue;
+      if (widget.type === 'radial') continue; // embedded in pulse grid
       const definition = this.widgetRegistry.get(widget.type);
       if (!definition) continue;
       try {
@@ -204,46 +247,101 @@ export class DashboardContent {
     window.setTimeout(() => host?.focus(), 50);
   }
 
-  // ── Today section (date header + pulse cards) — fixed chrome, not a widget ──
+  // ── Today section (date header + pulse grid) — fixed chrome, not a widget ──
 
-  private renderTodaySection(root: HTMLElement): void {
+  private renderTodaySection(root: HTMLElement, ctx: DashboardWidgetContext): void {
     const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
     dateRow.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
 
     const cards = (this.settings.pulseCards ?? []).filter((c) => c.enabled);
-    if (cards.length === 0) return;
+    const radialEnabled = (this.settings.dashboardWidgets ?? []).some((w) => w.type === 'radial' && w.enabled);
 
-    // Resolve trash data once (needed for trash cards)
+    if (cards.length === 0 && !radialEnabled) return;
+
+    // Pre-compute shared data
     const needsTrash = cards.some((c) => c.type === 'trash');
     const trashApi = needsTrash ? getTrashApi(this.app) : null;
     const trashCount = trashApi ? trashApi.getCandidates().length : 0;
-
-    // Pre-compute shared vault stats once
     const allFiles = this.app.vault.getMarkdownFiles();
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    const gitPlugin = cards.some((c) => c.type === 'git')
+      ? getExternalPlugin<{ gitReady: boolean }>(this.app, 'obsidian-git')
+      : null;
+
+    const streak = cards.some((c) => c.type === 'streak') ? computeStreak(allFiles, today) : 0;
+    const inboxCount = cards.some((c) => c.type === 'inbox')
+      ? countInboxFiles(this.app, this.settings.inboxPath ?? '')
+      : 0;
+    const pomodoroTimer = cards.some((c) => c.type === 'pomodoro') ? getPomodoroTimer(this.app) : null;
+    let pomodoroRunning = false;
+    if (pomodoroTimer) { const unsub = pomodoroTimer.subscribe((st) => { pomodoroRunning = st.running; }); unsub(); }
 
     const visibleCards = cards.filter((c) => {
       if (c.type === 'trash') return trashCount > 0;
+      if (c.type === 'git') return gitPlugin?.gitReady === true;
+      if (c.type === 'inbox') return inboxCount > 0;
+      if (c.type === 'pomodoro') return pomodoroRunning;
       return true;
     });
 
-    if (visibleCards.length === 0) return;
+    const grid = root.createEl('div', { cls: 'qw-dash-pulse-grid' });
+    const pctx = { allFiles, today, trashApi, trashCount, streak, inboxCount };
 
-    const pulseRow = root.createEl('div', { cls: 'qw-dash-pulse-row' });
+    // 3-column grid layout. Radial anchored at (col=2, row=2).
+    // Cards fill around it; the radial slot is always skipped when placing cards.
+    let row = 1;
+    let col = 1;
+    let leftFlankerEl: HTMLElement | null = null;
+    let rightFlankerEl: HTMLElement | null = null;
 
     for (const card of visibleCards) {
-      this.renderPulseCard(pulseRow, card, { allFiles, today, trashApi, trashCount });
+      const span = card.size ?? 1;
+
+      // Wrap to next row if span doesn't fit
+      if (col + span - 1 > 3) { row++; col = 1; }
+
+      // Radial row (row 2) constraints: only span-1 cards can flank; skip col 2 (radial slot)
+      if (radialEnabled && row === 2) {
+        if (col === 1 && span > 1) { row++; col = 1; }       // span-2/3 can't flank — push below
+        else if (col === 2) {
+          col = 3;
+          if (span > 1) { row++; col = 1; }                  // no room at col 3 either — push below
+        }
+      }
+
+      const el = grid.createEl('div', { cls: 'qw-dash-pulse-card' });
+      el.style.gridColumn = span === 1 ? String(col) : `${col} / span ${span}`;
+      el.style.gridRow = String(row);
+      this.populatePulseCard(el, card, pctx, ctx);
+
+      if (radialEnabled && row === 2 && col === 1) leftFlankerEl = el;
+      if (radialEnabled && row === 2 && col === 3) rightFlankerEl = el;
+
+      col += span;
+      if (col > 3) { col = 1; row++; }
+    }
+
+    if (radialEnabled) {
+      leftFlankerEl?.addClass('qw-dash-pulse-flanker');
+      rightFlankerEl?.addClass('qw-dash-pulse-flanker');
+
+      const slot = grid.createEl('div', { cls: 'qw-dash-radial-slot' });
+      slot.style.gridColumn = '2';
+      slot.style.gridRow = '2';
+      radialLauncherWidget.render(slot, ctx);
     }
   }
 
-  private renderPulseCard(
-    row: HTMLElement,
+  private populatePulseCard(
+    el: HTMLElement,
     card: PulseCard,
-    ctx: { allFiles: TFile[]; today: Date; trashApi: TrashApi | null; trashCount: number },
+    pctx: { allFiles: TFile[]; today: Date; trashApi: TrashApi | null; trashCount: number; streak: number; inboxCount: number },
+    widgetCtx: DashboardWidgetContext,
   ): void {
+    const ctx = pctx;
     switch (card.type) {
       case 'daily-note': {
-        const el = row.createEl('div', { cls: 'qw-dash-pulse-card qw-dash-pulse-card--accent' });
+        el.addClass('qw-dash-pulse-card--accent');
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Daily note' });
         el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--accent', text: 'Open' });
         el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'Jump to today' });
@@ -260,7 +358,6 @@ export class DashboardContent {
       }
       case 'modified-today': {
         const count = ctx.allFiles.filter((f) => this.getModifiedTime(f) >= ctx.today.getTime()).length;
-        const el = row.createEl('div', { cls: 'qw-dash-pulse-card' });
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Modified' });
         el.createEl('div', { cls: 'qw-dash-pulse-value', text: String(count) });
         el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'notes today' });
@@ -272,14 +369,12 @@ export class DashboardContent {
         let linkCount = 0;
         for (const f of ctx.allFiles) linkCount += this.app.metadataCache.getFileCache(f)?.links?.length ?? 0;
         const linkStr = linkCount >= 1000 ? `${(linkCount / 1000).toFixed(1)}k` : String(linkCount);
-        const el = row.createEl('div', { cls: 'qw-dash-pulse-card' });
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Vault' });
         el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--gold', text: noteStr });
         el.createEl('div', { cls: 'qw-dash-pulse-sub', text: `notes · ${linkStr} links` });
         break;
       }
       case 'trash': {
-        const el = row.createEl('div', { cls: 'qw-dash-pulse-card' });
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Needs review' });
         el.createEl('div', { cls: 'qw-dash-pulse-value', text: String(ctx.trashCount) });
         el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'stale notes' });
@@ -289,11 +384,74 @@ export class DashboardContent {
       case 'quick-action': {
         const action = card.quickAction;
         if (!action) break;
-        const el = row.createEl('div', { cls: 'qw-dash-pulse-card' });
         const iconWrap = el.createEl('div', { cls: 'qw-dash-pulse-action-icon' });
         setIcon(iconWrap, action.icon || 'zap');
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: action.label });
         el.addEventListener('click', () => { void this.handleQuickAction(action); });
+        break;
+      }
+      case 'git': {
+        const git = getExternalPlugin<{
+          gitReady: boolean;
+          cachedStatus?: { changed: unknown[]; staged: unknown[]; conflicted: string[] };
+          updateCachedStatus(): Promise<{ changed: unknown[]; staged: unknown[]; conflicted: string[] }>;
+        }>(this.app, 'obsidian-git');
+        if (!git?.gitReady) break;
+        const status = git.cachedStatus;
+        if (!status) void git.updateCachedStatus();
+        const changedCount = (status?.changed.length ?? 0) + (status?.staged.length ?? 0);
+        const conflictCount = status?.conflicted.length ?? 0;
+        el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Git' });
+        if (conflictCount > 0) {
+          el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--conflict', text: String(conflictCount) });
+          el.createEl('div', { cls: 'qw-dash-pulse-sub', text: `conflict${conflictCount === 1 ? '' : 's'}` });
+        } else if (changedCount > 0) {
+          el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--gold', text: String(changedCount) });
+          el.createEl('div', { cls: 'qw-dash-pulse-sub', text: `change${changedCount === 1 ? '' : 's'}` });
+        } else {
+          el.createEl('div', { cls: 'qw-dash-pulse-value', text: '✓' });
+          el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'up to date' });
+        }
+        el.addEventListener('click', (e) => {
+          if (this.settings.gitPulseCardAction === 'menu') {
+            const menu = new Menu();
+            const cmds = (this.app as unknown as { commands: { commands: Record<string, { id: string; name: string }> } }).commands.commands;
+            for (const cmd of Object.values(cmds)) {
+              if (cmd.id.startsWith('obsidian-git:')) {
+                menu.addItem((item) => item.setTitle(cmd.name).onClick(() => { this.app.commands.executeCommandById(cmd.id); }));
+              }
+            }
+            menu.showAtMouseEvent(e);
+          } else {
+            this.close();
+            this.app.commands.executeCommandById('obsidian-git:push');
+          }
+        });
+        break;
+      }
+      case 'streak': {
+        el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Streak' });
+        el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--accent', text: String(ctx.streak) });
+        el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'days' });
+        break;
+      }
+      case 'inbox': {
+        el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Inbox' });
+        el.createEl('div', { cls: 'qw-dash-pulse-value', text: String(ctx.inboxCount) });
+        el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'to process' });
+        break;
+      }
+      case 'pomodoro': {
+        const timer = getPomodoroTimer(this.app);
+        if (!timer) break;
+        el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Pomodoro' });
+        const timeEl = el.createEl('div', { cls: 'qw-dash-pulse-value' });
+        const subEl = el.createEl('div', { cls: 'qw-dash-pulse-sub' });
+        const unsub = timer.subscribe((state) => {
+          timeEl.setText(state.remained.human);
+          subEl.setText(state.mode === 'WORK' ? 'focus' : 'break');
+        });
+        widgetCtx.onCleanup(unsub);
         break;
       }
       case 'homepage': {
@@ -301,7 +459,6 @@ export class DashboardContent {
         const homeFile = homePath
           ? (this.app.vault.getFileByPath(homePath) ?? this.app.metadataCache.getFirstLinkpathDest(homePath, ''))
           : null;
-        const el = row.createEl('div', { cls: 'qw-dash-pulse-card' });
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Home' });
         const iconEl = el.createEl('div', { cls: 'qw-dash-pulse-home-icon' });
         setIcon(iconEl, 'home');

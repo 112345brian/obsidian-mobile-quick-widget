@@ -256,18 +256,18 @@
   line-height: 1;
 }
 
-/* ── Daily pulse cards ── */
+/* ── Daily pulse grid ── */
 
-.qw-dash-pulse-row {
-  display: flex;
-  flex-wrap: wrap;
+.qw-dash-pulse-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
   padding: 10px 16px 0;
   margin-bottom: 20px;
+  position: relative;
 }
 
 .qw-dash-pulse-card {
-  flex: 1;
   background: var(--qw-surface);
   border: 1px solid var(--qw-border);
   border-radius: 14px;
@@ -276,7 +276,31 @@
   overflow: hidden;
   cursor: pointer;
   touch-action: manipulation;
-  transition: opacity 0.1s;
+  transition: opacity 0.15s;
+}
+
+/* Radial grid slot — always column 2, row 2 */
+.qw-dash-radial-slot {
+  display: flex;
+  align-items: stretch;
+  transition: grid-column 0s;
+}
+
+.qw-dash-radial-slot .qw-dash-radial-card {
+  margin: 0;
+  width: 100%;
+  flex: 1;
+}
+
+/* When radial is expanded: take full row width, hide flanking pulse cards */
+.qw-dash-pulse-grid--radial-expanded .qw-dash-radial-slot {
+  grid-column: 1 / span 3;
+}
+
+.qw-dash-pulse-grid--radial-expanded .qw-dash-pulse-flanker {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
 }
 
 .qw-dash-pulse-card:active {
@@ -317,6 +341,10 @@
 
 .qw-dash-pulse-value--gold {
   color: var(--qw-gold);
+}
+
+.qw-dash-pulse-value--conflict {
+  color: #bf5c7c;
 }
 
 .qw-dash-pulse-home-icon {
@@ -444,51 +472,6 @@
   color: var(--qw-text-muted);
 }
 
-/* ── Git card ── */
-
-.qw-dash-git-card {
-  margin: 0 16px 20px;
-  padding: 16px;
-  background: var(--qw-surface);
-  border: 1px solid var(--qw-border);
-  border-radius: 14px;
-  text-align: center;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.qw-dash-git-card:active {
-  opacity: 0.7;
-}
-
-.qw-dash-git-card--dirty {
-  border-color: var(--qw-gold);
-}
-
-.qw-dash-git-card--conflict {
-  border-color: #bf5c7c;
-}
-
-.qw-dash-git-branch {
-  font-family: var(--qw-mono);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--qw-text-primary);
-}
-
-.qw-dash-git-status {
-  margin-top: 4px;
-  font-size: 10px;
-  color: var(--qw-text-muted);
-}
-
-.qw-dash-git-card--dirty .qw-dash-git-status {
-  color: var(--qw-gold);
-}
-
-.qw-dash-git-card--conflict .qw-dash-git-status {
-  color: #bf5c7c;
-}
 
 /* ── Task card ── */
 
@@ -651,11 +634,24 @@
   overflow: hidden;
 }
 
+.qw-dash-note-fm {
+  font-size: 10px;
+  color: var(--qw-text-muted);
+  margin-top: 2px;
+  opacity: 0.75;
+}
+
+.qw-dash-note-title-right {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .qw-dash-note-time {
   font-family: var(--qw-mono);
   font-size: 10px;
   color: var(--qw-text-muted);
-  flex-shrink: 0;
   white-space: nowrap;
 }
 
@@ -1065,9 +1061,6 @@
   flex-direction: row-reverse;
 }
 
-.qw-dash--right .qw-dash-pulse-row {
-  flex-direction: row-reverse;
-}
 
 .qw-dash--right .qw-dash-note-title-row {
   flex-direction: row-reverse;

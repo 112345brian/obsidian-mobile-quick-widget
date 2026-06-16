@@ -241,6 +241,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           });
       });
 
+    this.renderNoteCardSection(s);
     this.renderDashboardSection(s);
     this.renderPulseCardsSection(s);
     this.renderQuickActionsSection(s);
@@ -269,6 +270,65 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           void this.plugin.settingsManager.saveToFile();
           this.display();
         });
+      });
+  }
+
+  private renderNoteCardSection(s: PluginSettings): void {
+    this.containerEl.createEl('h3', { text: 'Note Card' });
+    this.containerEl.createEl('p', {
+      cls: 'setting-item-description',
+      text: 'Controls what each note card shows in the Touched and Modified lists.',
+    });
+
+    new Setting(this.containerEl)
+      .setName('Show breadcrumb parent')
+      .setDesc('Show the parent note above each card title.')
+      .addToggle((t) => {
+        t.setValue(s.showBreadcrumbs ?? true).onChange((val) => {
+          s.showBreadcrumbs = val;
+          void this.plugin.settingsManager.saveToFile();
+        });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Show tags')
+      .addToggle((t) => {
+        t.setValue(s.cardShowTags ?? true).onChange((val) => {
+          s.cardShowTags = val;
+          void this.plugin.settingsManager.saveToFile();
+        });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Show backlink count')
+      .addToggle((t) => {
+        t.setValue(s.cardShowBacklinks ?? true).onChange((val) => {
+          s.cardShowBacklinks = val;
+          void this.plugin.settingsManager.saveToFile();
+        });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Show preview')
+      .setDesc('Show a short text excerpt from the note body.')
+      .addToggle((t) => {
+        t.setValue(s.cardShowPreview ?? true).onChange((val) => {
+          s.cardShowPreview = val;
+          void this.plugin.settingsManager.saveToFile();
+        });
+      });
+
+    new Setting(this.containerEl)
+      .setName('Extra frontmatter fields')
+      .setDesc('Frontmatter fields to show on each card, one per line (e.g. status, type). Only shown when the field is present.')
+      .addTextArea((t) => {
+        t
+          .setPlaceholder('status\ntype')
+          .setValue((s.cardFrontmatterFields ?? []).join('\n'))
+          .onChange((val) => {
+            s.cardFrontmatterFields = val.split('\n').map((f) => f.trim()).filter(Boolean);
+            void this.plugin.settingsManager.saveToFile();
+          });
       });
   }
 
@@ -348,6 +408,11 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
 
       const setting = new Setting(this.containerEl)
         .setName(card.type === 'quick-action' && card.quickAction ? card.quickAction.label : PULSE_CARD_LABELS[card.type])
+        .addDropdown((dd) => {
+          dd.addOption('1', '1 col').addOption('2', '2 col').addOption('3', '3 col');
+          dd.setValue(String(card.size ?? 1));
+          dd.onChange((v) => { card.size = Number(v) as 1 | 2 | 3; save(); });
+        })
         .addToggle((t) => { t.setValue(card.enabled).onChange((v) => { card.enabled = v; save(); }); })
         .addExtraButton((btn) => {
           btn.setIcon('arrow-up').setTooltip('Move up').onClick(() => {
@@ -383,7 +448,11 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           .addOption('vault', PULSE_CARD_LABELS['vault'])
           .addOption('trash', PULSE_CARD_LABELS['trash'])
           .addOption('homepage', PULSE_CARD_LABELS['homepage'])
-          .addOption('quick-action', PULSE_CARD_LABELS['quick-action']);
+          .addOption('quick-action', PULSE_CARD_LABELS['quick-action'])
+          .addOption('git', PULSE_CARD_LABELS['git'])
+          .addOption('streak', PULSE_CARD_LABELS['streak'])
+          .addOption('inbox', PULSE_CARD_LABELS['inbox'])
+          .addOption('pomodoro', PULSE_CARD_LABELS['pomodoro']);
         dd.onChange((val) => {
           const type = val as PulseCard['type'];
           if (type === 'quick-action') {
@@ -401,6 +470,29 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           void this.plugin.settingsManager.saveToFile(); this.display();
         });
       });
+
+    if (cards.some((c) => c.type === 'inbox')) {
+      new Setting(this.containerEl)
+        .setName('Inbox folder path')
+        .setDesc('Folder to count for the Inbox pulse card, e.g. "Inbox" or "Capture/Unsorted".')
+        .addText((t) => {
+          t.setPlaceholder('Inbox').setValue(s.inboxPath ?? '').onChange((val) => {
+            s.inboxPath = val.trim();
+            void this.plugin.settingsManager.saveToFile();
+          });
+        });
+    }
+
+    if (cards.some((c) => c.type === 'git')) {
+      new Setting(this.containerEl)
+        .setName('Git card — tap action')
+        .setDesc('What tapping the Git pulse card does.')
+        .addDropdown((dd) => {
+          dd.addOption('sync', 'Commit and sync').addOption('menu', 'Open git menu');
+          dd.setValue(s.gitPulseCardAction ?? 'sync');
+          dd.onChange((v) => { s.gitPulseCardAction = v as 'sync' | 'menu'; void this.plugin.settingsManager.saveToFile(); });
+        });
+    }
   }
 
   private renderQuickActionsSection(s: PluginSettings): void {

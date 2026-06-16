@@ -142,7 +142,6 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
   let expanded = false;
   let currentSlots: (Slot | undefined)[] = [];
 
-  root.createEl('div', { cls: 'qw-dash-section-label', text: 'RADIAL' });
   const card = root.createEl('div', { cls: 'qw-dash-radial-card' });
   let cancelPress: (() => void) | null = null;
   let centerTapTimer: number | null = null;
@@ -165,6 +164,7 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
   // drifts while the card grows/shrinks.
   const centerSelector = '.qw-dash-radial-compact-center, .qw-dash-radial-expanded-center';
   const setExpanded = (next: boolean): void => {
+    card.closest('.qw-dash-pulse-grid')?.classList.toggle('qw-dash-pulse-grid--radial-expanded', next);
     stopScrollSync?.();
     const before = card.querySelector<HTMLElement>(centerSelector)?.getBoundingClientRect();
     expanded = next;

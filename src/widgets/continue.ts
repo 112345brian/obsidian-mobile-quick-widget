@@ -42,23 +42,45 @@ async function render(root: HTMLElement, ctx: DashboardWidgetContext): Promise<v
         }
       }
 
+      const backlinkCount = backlinkCounts.get(file.path) ?? 0;
+
       const titleRow = meta.createEl('div', { cls: 'qw-dash-note-title-row' });
       titleRow.createEl('span', { cls: 'qw-dash-note-title', text: file.basename });
-      titleRow.createEl('span', {
+      const titleRight = titleRow.createEl('span', { cls: 'qw-dash-note-title-right' });
+      if ((ctx.settings.cardShowBacklinks ?? true) && backlinkCount > 0) {
+        titleRight.createEl('span', { cls: 'qw-dash-note-links', text: `← ${backlinkCount}` });
+      }
+      titleRight.createEl('span', {
         cls: 'qw-dash-note-time',
         text: fromNow(showModified ? getModifiedTime(ctx.app, ctx.settings, file) : file.stat.mtime),
       });
 
-      const tags = noteTags(file, ctx.app);
-      const backlinkCount = backlinkCounts.get(file.path) ?? 0;
-      const detail = meta.createEl('div', { cls: 'qw-dash-note-detail' });
-      if (backlinkCount > 0) detail.createEl('span', { cls: 'qw-dash-note-links', text: `← ${backlinkCount}` });
-      for (const tag of tags) detail.createEl('span', { cls: 'qw-dash-note-tag', text: tag });
+      const showTags = ctx.settings.cardShowTags ?? true;
+      const tags = showTags ? noteTags(file, ctx.app) : [];
+      if (tags.length > 0) {
+        const detail = meta.createEl('div', { cls: 'qw-dash-note-detail' });
+        for (const tag of tags) detail.createEl('span', { cls: 'qw-dash-note-tag', text: tag });
+      }
 
-      try {
-        const preview = extractTailPreview(await ctx.app.vault.cachedRead(file));
-        if (preview) meta.createEl('div', { cls: 'qw-dash-note-preview', text: preview });
-      } catch { /* skip */ }
+      const fmFields = ctx.settings.cardFrontmatterFields ?? [];
+      if (fmFields.length > 0) {
+        const fm = ctx.app.metadataCache.getFileCache(file)?.frontmatter;
+        if (fm) {
+          for (const field of fmFields) {
+            const val = fm[field];
+            if (val !== undefined && val !== null && val !== '') {
+              meta.createEl('div', { cls: 'qw-dash-note-fm', text: `${field}: ${String(val)}` });
+            }
+          }
+        }
+      }
+
+      if (ctx.settings.cardShowPreview ?? true) {
+        try {
+          const preview = extractTailPreview(await ctx.app.vault.cachedRead(file));
+          if (preview) meta.createEl('div', { cls: 'qw-dash-note-preview', text: preview });
+        } catch { /* skip */ }
+      }
 
       row.addEventListener('click', () => ctx.openFile(file));
     }
