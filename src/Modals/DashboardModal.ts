@@ -106,15 +106,15 @@ export class DashboardModal extends Modal {
     containerEl.addClass('qw-dash-container');
     modalEl.addClass('qw-dash-modal');
 
-    modalEl.createEl('div', { cls: 'qw-dash-handle' });
-
-    // Explicit inner scroll container — don't rely on .modal-content scrolling
     const scroll = contentEl.createEl('div', { cls: 'qw-dash-scroll' });
     const inner = scroll.createEl('div', { cls: 'qw-dash' });
 
+    // Overdrag-to-new-note indicator (hidden above content until pulled)
+    const overdrag = inner.createEl('div', { cls: 'qw-overdrag' });
+    overdrag.createEl('div', { cls: 'qw-overdrag-icon', text: '+' });
+
     const widgets = this.settings.dashboardWidgets ?? [];
 
-    this.renderCapture(inner);
     this.renderTodaySection(inner);
 
     for (const widget of widgets) {
@@ -125,6 +125,8 @@ export class DashboardModal extends Modal {
         case 'new-note': this.renderMoreActions(inner); break;
       }
     }
+
+    this.attachOverdrag(contentEl, overdrag);
   }
 
   public override onClose(): void {
@@ -133,28 +135,6 @@ export class DashboardModal extends Modal {
 
   // ── Sections ───────────────────────────────────────────────────────────────
 
-  private renderCapture(root: HTMLElement): void {
-    const appendAction = (this.settings.quickActions ?? []).find((a) => a.action === 'append-to-note');
-
-    const bar = root.createEl('div', { cls: 'qw-dash-capture' });
-
-    bar.createEl('div', { cls: 'qw-dash-capture-icon', text: '✦' });
-
-    bar.createEl('div', {
-      cls: 'qw-dash-capture-placeholder',
-      text: appendAction
-        ? `Add to ${this.app.vault.getFileByPath(appendAction.notePath ?? '')?.basename ?? 'note'}…`
-        : 'Capture a thought…',
-    });
-
-    bar.addEventListener('click', () => {
-      if (appendAction) {
-        void this.handleQuickAction(appendAction);
-      } else {
-        void this.handleQuickAction({ label: 'New note', icon: 'file-plus', action: 'new-note' });
-      }
-    });
-  }
 
   private renderTodaySection(root: HTMLElement): void {
     const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
@@ -404,6 +384,73 @@ export class DashboardModal extends Modal {
       btn.createEl('span', { text: action.label });
       btn.addEventListener('click', () => { void this.handleQuickAction(action); });
     }
+  }
+
+  // ── Overdrag gesture ──────────────────────────────────────────────────────
+
+  private attachOverdrag(scrollEl: HTMLElement, indicator: HTMLElement): void {
+    const THRESHOLD = 72;
+    const icon = indicator.querySelector('.qw-overdrag-icon') as HTMLElement;
+    let startY = 0;
+    let pulling = false;
+    let peaked = false;
+
+    const reset = (): void => {
+      pulling = false;
+      peaked = false;
+      indicator.style.marginTop = '';
+      indicator.classList.remove('qw-overdrag--ready', 'qw-overdrag--fired');
+    };
+
+    scrollEl.addEventListener('touchstart', (e: TouchEvent) => {
+      if (scrollEl.scrollTop <= 0) {
+        startY = e.touches[0]!.clientY;
+        pulling = true;
+        peaked = false;
+      }
+    }, { passive: true });
+
+    scrollEl.addEventListener('touchmove', (e: TouchEvent) => {
+      if (!pulling) return;
+      if (scrollEl.scrollTop > 0) { reset(); return; }
+      const delta = e.touches[0]!.clientY - startY;
+      if (delta <= 0) { reset(); return; }
+
+      e.preventDefault();
+
+      const clamped = Math.min(delta, THRESHOLD * 1.4);
+      // slide the indicator in from above: starts at -THRESHOLD, reaches 0 at threshold
+      indicator.style.marginTop = `${Math.min(clamped - THRESHOLD, 0)}px`;
+
+      const progress = delta / THRESHOLD;
+      const scale = 0.5 + Math.min(progress, 1) * 0.5;
+      icon.style.transform = `scale(${scale})`;
+
+      if (progress >= 1 && !peaked) {
+        peaked = true;
+        indicator.classList.add('qw-overdrag--ready');
+        try { (navigator as Navigator & { vibrate?: (d: number) => void }).vibrate?.(8); } catch { /* */ }
+      } else if (progress < 1 && peaked) {
+        peaked = false;
+        indicator.classList.remove('qw-overdrag--ready');
+      }
+    }, { passive: false });
+
+    scrollEl.addEventListener('touchend', async () => {
+      if (!pulling) return;
+      if (!peaked) { reset(); return; }
+
+      pulling = false;
+      indicator.classList.add('qw-overdrag--fired');
+      try { (navigator as Navigator & { vibrate?: (d: number) => void }).vibrate?.(30); } catch { /* */ }
+
+      await new Promise<void>((r) => setTimeout(r, 320));
+      this.close();
+      const file = await createNote(this.app, this.settings);
+      await this.app.workspace.getMostRecentLeaf()?.openFile(file);
+    });
+
+    scrollEl.addEventListener('touchcancel', reset);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

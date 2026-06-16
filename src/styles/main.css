@@ -156,23 +156,58 @@
 }
 
 .qw-dash-handle {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 36px;
-  height: 4px;
-  background: #333338;
-  border-radius: 2px;
-  z-index: 5;
-  pointer-events: none;
+  display: none;
 }
 
 .qw-dash {
   display: flex;
   flex-direction: column;
-  padding: 42px 0 32px;
+  padding: 28px 0 32px;
   color: var(--qw-text-primary);
+}
+
+/* ── Overdrag to new note ── */
+
+.qw-overdrag {
+  height: 72px;
+  margin-top: -72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: margin-top 0.05s linear;
+}
+
+.qw-overdrag-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--qw-surface2);
+  border: 1px solid var(--qw-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--qw-text-muted);
+  transform: scale(0.5);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.qw-overdrag--ready .qw-overdrag-icon {
+  background: var(--qw-purple-dim);
+  border-color: var(--qw-purple-border);
+  color: var(--qw-purple-bright);
+}
+
+@keyframes qw-overdrag-burst {
+  0%   { transform: scale(1);   opacity: 1; }
+  40%  { transform: scale(1.5); opacity: 1; background: rgba(124,92,191,0.4); }
+  100% { transform: scale(0.4); opacity: 0; }
+}
+
+.qw-overdrag--fired .qw-overdrag-icon {
+  animation: qw-overdrag-burst 0.32s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 /* ── Capture bar ── */
