@@ -74,7 +74,7 @@ export const WIDGET_LABELS: Record<DashboardWidgetType, string> = {
   tasks: 'Open Tasks',
 };
 
-export type NewNoteFilenameFormat = 'untitled' | 'zettelkasten';
+export type NewNoteFilenameFormat = 'untitled' | 'zettelkasten' | 'custom';
 
 export type PulseCardType = 'daily-note' | 'modified-today' | 'vault' | 'trash' | 'quick-action' | 'homepage';
 
@@ -107,6 +107,7 @@ export class PluginSettings {
   public continueExcluded: string[] = [];
   public quickActions: QuickAction[] = QUICK_ACTION_DEFAULTS.map((a) => ({ ...a }));
   public newNoteFilenameFormat: NewNoteFilenameFormat = 'untitled';
+  public newNoteFilenameCustom = '';
   public pulseCards: PulseCard[] = DEFAULT_PULSE_CARDS.map((c) => ({ ...c }));
   public slices: SliceConfig[] = [
     { label: 'Cancel', icon: '✕', action: 'cancel', color: '#666666', startAngle: 0, endAngle: 180 },

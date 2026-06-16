@@ -224,10 +224,67 @@ export class DashboardModal extends Modal {
     }
 
     this.attachOverdrag(contentEl, overdrag);
+    this.attachKeyNav(modalEl, contentEl);
   }
 
   public override onClose(): void {
     this.contentEl.empty();
+  }
+
+  private attachKeyNav(modalEl: HTMLElement, contentEl: HTMLElement): void {
+    let idx = -1;
+
+    const rows = (): HTMLElement[] =>
+      Array.from(modalEl.querySelectorAll<HTMLElement>('.qw-dash-note-row, .qw-dash-task-row'));
+
+    const focus = (next: number): void => {
+      const all = rows();
+      all[idx]?.removeClass('qw-dash-row--focused');
+      idx = Math.max(0, Math.min(next, all.length - 1));
+      const el = all[idx];
+      if (!el) return;
+      el.addClass('qw-dash-row--focused');
+      el.scrollIntoView({ block: 'nearest' });
+    };
+
+    modalEl.addEventListener('keydown', (e: KeyboardEvent) => {
+      const all = rows();
+      if (all.length === 0) return;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          focus(idx < 0 ? 0 : idx + 1);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          focus(idx < 0 ? all.length - 1 : idx - 1);
+          break;
+        case 'Enter':
+          if (idx >= 0) { e.preventDefault(); all[idx]?.click(); }
+          break;
+        case 'ArrowLeft':
+        case 'ArrowRight': {
+          // Switch TOUCHED / MODIFIED tabs
+          const tabs = modalEl.querySelectorAll<HTMLElement>('.qw-dash-segment-tab');
+          const active = modalEl.querySelector<HTMLElement>('.qw-dash-segment-tab--active');
+          if (tabs.length === 2 && active) {
+            const next = active === tabs[0] ? tabs[1] : tabs[0];
+            next?.click();
+            idx = -1;
+          }
+          break;
+        }
+        case 'Escape':
+          this.close();
+          break;
+      }
+    });
+
+    // Make modal focusable so keydown fires without clicking first
+    if (!modalEl.hasAttribute('tabindex')) modalEl.setAttribute('tabindex', '-1');
+    void contentEl;
+    setTimeout(() => modalEl.focus(), 50);
   }
 
   // ── Sections ───────────────────────────────────────────────────────────────

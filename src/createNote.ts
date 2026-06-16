@@ -3,21 +3,25 @@ import type { ReadonlyDeep } from 'type-fest';
 
 import type { PluginSettings } from './PluginSettings.ts';
 
+function pad(n: number, len = 2): string { return String(n).padStart(len, '0'); }
+
+function applyFormatTokens(fmt: string, d: Date): string {
+  return fmt
+    .replace(/YYYY/g, String(d.getFullYear()))
+    .replace(/YY/g,   String(d.getFullYear()).slice(-2))
+    .replace(/MM/g,   pad(d.getMonth() + 1))
+    .replace(/DD/g,   pad(d.getDate()))
+    .replace(/HH/g,   pad(d.getHours()))
+    .replace(/mm/g,   pad(d.getMinutes()))
+    .replace(/ss/g,   pad(d.getSeconds()));
+}
+
 function isoDate(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return applyFormatTokens('YYYY-MM-DD', new Date());
 }
 
 function zettelkastenId(): string {
-  const d = new Date();
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
-    String(d.getHours()).padStart(2, '0'),
-    String(d.getMinutes()).padStart(2, '0'),
-    String(d.getSeconds()).padStart(2, '0'),
-  ].join('');
+  return applyFormatTokens('YYYYMMDDHHmmss', new Date());
 }
 
 function getTemplater(app: App): { overwrite_file_commands?: (f: TFile, open: boolean) => Promise<void> } | null {
@@ -34,13 +38,17 @@ export async function createNote(app: App, settings: ReadonlyDeep<PluginSettings
   const templateFile = templatePath ? app.vault.getFileByPath(templatePath) : null;
   const content = templateFile ? await app.vault.read(templateFile) : '';
 
-  const useZettel = settings.newNoteFilenameFormat === 'zettelkasten';
-  const baseName = useZettel ? zettelkastenId() : `Untitled ${isoDate()}`;
+  const fmt = settings.newNoteFilenameFormat;
+  const baseName = fmt === 'zettelkasten'
+    ? zettelkastenId()
+    : fmt === 'custom' && settings.newNoteFilenameCustom
+      ? applyFormatTokens(settings.newNoteFilenameCustom, new Date())
+      : `Untitled ${isoDate()}`;
 
   let finalPath = folder ? `${folder}/${baseName}.md` : `${baseName}.md`;
   let n = 1;
   while (app.vault.getFileByPath(finalPath)) {
-    const alt = useZettel ? `${baseName}-${n}` : `${baseName} ${n}`;
+    const alt = fmt === 'untitled' ? `${baseName} ${n}` : `${baseName}-${n}`;
     finalPath = folder ? `${folder}/${alt}.md` : `${alt}.md`;
     n++;
   }

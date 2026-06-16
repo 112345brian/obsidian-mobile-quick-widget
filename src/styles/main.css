@@ -553,6 +553,13 @@
   opacity: 0.7;
 }
 
+.qw-dash-row--focused,
+.qw-dash-task-row.qw-dash-row--focused {
+  background: rgba(155, 124, 232, 0.08);
+  outline: 1px solid rgba(155, 124, 232, 0.25);
+  outline-offset: -1px;
+}
+
 .qw-dash-note-meta {
   flex: 1;
   min-width: 0;

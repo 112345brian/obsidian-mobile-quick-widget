@@ -52,19 +52,37 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
           });
       });
 
+    let customFormatEl: HTMLElement | null = null;
+
     new Setting(this.containerEl)
       .setName('New note filename format')
-      .setDesc('Untitled uses "Untitled YYYY-MM-DD". Zettelkasten uses a 14-digit timestamp ID (YYYYMMDDHHmmss).')
+      .setDesc('Custom lets you define the format using date/time tokens.')
       .addDropdown((dd) => {
         dd
           .addOption('untitled', 'Untitled + date')
-          .addOption('zettelkasten', 'Zettelkasten ID (unique notes)')
+          .addOption('zettelkasten', 'Zettelkasten (YYYYMMDDHHmmss)')
+          .addOption('custom', 'Custom format')
           .setValue(s.newNoteFilenameFormat)
           .onChange((val) => {
             s.newNoteFilenameFormat = val as NewNoteFilenameFormat;
+            if (customFormatEl) customFormatEl.style.display = val === 'custom' ? '' : 'none';
             void this.plugin.settingsManager.saveToFile();
           });
       });
+
+    const customSetting = new Setting(this.containerEl)
+      .setName('Custom filename format')
+      .setDesc('Tokens: YYYY YY MM DD HH mm ss — e.g. YYMMDD_HHmmss')
+      .addText((t) => {
+        t.setPlaceholder('YYMMDD_HHmmss')
+          .setValue(s.newNoteFilenameCustom ?? '')
+          .onChange((val) => {
+            s.newNoteFilenameCustom = val.trim();
+            void this.plugin.settingsManager.saveToFile();
+          });
+      });
+    customFormatEl = customSetting.settingEl;
+    customFormatEl.style.display = s.newNoteFilenameFormat === 'custom' ? '' : 'none';
 
     new Setting(this.containerEl)
       .setName('Continue — excluded paths')
