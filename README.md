@@ -30,7 +30,7 @@ Three modes on a single ring, switched by tapping the center node or the mode-ke
 - Both surfaces are stateless by default — each always opens fresh unless you enable "Remember last mode"
 
 ### Dashboard
-A bottom-sheet modal with modular widgets:
+An opaque bottom-sheet modal with modular widgets:
 
 **Radial Launcher**
 - Compact center button for the radial menu inside the dashboard

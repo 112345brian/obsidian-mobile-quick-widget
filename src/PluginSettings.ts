@@ -89,9 +89,17 @@ export function normalizeDashboardWidgets(
 ): DashboardWidget[] {
   const output: DashboardWidget[] = [];
   const seen = new Set<string>();
+  const hasSavedRadial = widgets.some((widget) => widget.type === 'radial');
 
   for (const widget of widgets) {
     if (seen.has(widget.type)) continue;
+    if (widget.type === 'graph' && widget.enabled && !hasSavedRadial && knownIds.includes('radial')) {
+      output.push({ type: 'radial', enabled: true });
+      seen.add('radial');
+      output.push({ type: 'graph', enabled: false });
+      seen.add('graph');
+      continue;
+    }
     output.push({ type: widget.type, enabled: widget.enabled });
     seen.add(widget.type);
   }

@@ -14,6 +14,8 @@
 - Dashboard **Radial Launcher** widget: a compact radial center button that expands into the preferred radial section while pressed; releasing without selecting collapses it back down.
 
 ### Fixed
+- Existing dashboard configs that had **Active Cluster graph** enabled now migrate to the **Radial Launcher** widget, with the old graph left disabled. This keeps upgraded installs aligned with the new default dashboard layout instead of preserving the stale graph-heavy view.
+- Dashboard modal styling now forces an opaque dark background on the modal shell, content root, and backdrop so note text no longer bleeds through under transparent Obsidian/theme modal styles.
 - The dashboard's "Needs Review" widget toggle was dead — `trash` was never a real dashboard widget (only a Pulse Card), so enabling it did nothing. Removed it from presets; the working Pulse Card version is unaffected.
 - The breadcrumb radial's overflow slot (shown when a note has more children than fit) used to redirect to the *other* radial surface — the dashboard's embedded launcher opened the full-screen radial menu, and the full-screen menu's own overflow slot opened the dashboard right back. For a note with more than 2 children, tapping overflow on either surface bounced forever without ever showing the extra children. It now opens a simple menu listing the overflowed children directly, on both surfaces.
 - Keyboard arrow-key navigation in the dashboard sidebar went dead after the sidebar was collapsed and revealed again, since focus was only ever applied once (on the sidebar's first render) and revealing an already-open sidebar leaf doesn't re-run that setup. Revealing the sidebar now re-applies focus every time.
