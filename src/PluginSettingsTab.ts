@@ -177,7 +177,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
 
     new Setting(this.containerEl)
       .setName('Dashboard radial interaction')
-      .setDesc('Press & hold: press the center, drag to a slot, release to select (release elsewhere cancels). Tap to toggle: tap the center to open it and leave it open, tap a slot to select, tap the center again to cycle modes, double-tap the center (or tap outside) to close.')
+      .setDesc('Press & hold: touch/pen press the center, drag to a slot, release to select (release elsewhere cancels); mouse/keyboard opens a stable desktop view. Tap to toggle: tap the center to open it and leave it open, tap a slot to select, tap the center again to cycle modes, double-tap the center (or tap outside) to close.')
       .addDropdown((d) => {
         d.addOption('press-hold', 'Press & hold')
           .addOption('tap-toggle', 'Tap to toggle')

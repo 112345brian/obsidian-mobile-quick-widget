@@ -169,8 +169,9 @@ export class PluginSettings {
 
 export type RadialMode = 'breadcrumbs' | 'commands' | 'recents';
 
-// 'press-hold': press the center to reveal the ring, drag to a slot and
-//   release to select, release elsewhere (or cancel) to collapse.
+// 'press-hold': touch/pen press the center to reveal the ring, drag to a slot
+//   and release to select, release elsewhere (or cancel) to collapse. Mouse and
+//   keyboard activation open the ring as a stable expanded state for desktop.
 // 'tap-toggle': tap the center to open and it stays open; tap a slot to
 //   select; tap the center again to cycle modes; double-tap the center
 //   (or tap outside the ring) to collapse.

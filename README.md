@@ -34,8 +34,10 @@ An opaque bottom-sheet modal with modular widgets:
 
 **Radial Launcher**
 - Compact center button for the radial menu inside the dashboard
-- Press/hold to expand into your preferred radial section: Breadcrumbs, Commands, or Recents
+- Touch/pen press-hold expands into your preferred radial section: Breadcrumbs, Commands, or Recents
 - Release over a slot to select it; release anywhere else to collapse back to the compact button
+- Mouse/keyboard activation opens a stable expanded desktop view for testing or inspection
+- Empty breadcrumb positions are hidden; only real actionable slots are drawn
 - New installs use this in the Full preset instead of the persistent Active Cluster graph
 
 **Recently Touched / Modified**

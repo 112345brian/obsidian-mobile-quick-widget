@@ -18,30 +18,59 @@ interface SlotPos {
   top: number;
 }
 
+const STAGE_SIZE = 240;
+const STAGE_CENTER = STAGE_SIZE / 2;
+const GUIDE_RADIUS = 82;
 const SLOTS: SlotPos[] = [
-  { left: 130, top: 34 },
-  { left: 213, top: 82 },
-  { left: 213, top: 178 },
-  { left: 130, top: 226 },
-  { left: 47, top: 178 },
-  { left: 47, top: 82 },
+  { left: STAGE_CENTER, top: STAGE_CENTER - GUIDE_RADIUS },
+  { left: STAGE_CENTER + 71, top: STAGE_CENTER - 41 },
+  { left: STAGE_CENTER + 71, top: STAGE_CENTER + 41 },
+  { left: STAGE_CENTER, top: STAGE_CENTER + GUIDE_RADIUS },
+  { left: STAGE_CENTER - 71, top: STAGE_CENTER + 41 },
+  { left: STAGE_CENTER - 71, top: STAGE_CENTER - 41 },
 ];
 
 const MODE_ABBR: Record<RadialMode, string> = { breadcrumbs: 'BC', commands: 'CMD', recents: 'RE' };
 const MODE_LABEL: Record<RadialMode, string> = { breadcrumbs: 'Breadcrumbs', commands: 'Commands', recents: 'Recents' };
 const MODE_ORDER: RadialMode[] = ['breadcrumbs', 'commands', 'recents'];
 
-function guideSvg(mode: RadialMode): string {
-  if (mode === 'breadcrumbs') {
-    return `<svg class="qw-dash-radial-guide" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg">
-      <path d="M 58.99 58.99 A 100 100 0 0 1 201.01 58.99" fill="none" stroke="#c9a84c" stroke-width="1" stroke-dasharray="3 5" opacity="0.25"/>
-      <path d="M 201.01 58.99 A 100 100 0 0 1 201.01 201.01" fill="none" stroke="#bf5c7c" stroke-width="1" stroke-dasharray="3 5" opacity="0.25"/>
-      <path d="M 201.01 201.01 A 100 100 0 0 1 58.99 201.01" fill="none" stroke="#4ca8a0" stroke-width="1" stroke-dasharray="3 5" opacity="0.25"/>
-      <path d="M 58.99 201.01 A 100 100 0 0 1 58.99 58.99" fill="none" stroke="#bf5c7c" stroke-width="1" stroke-dasharray="3 5" opacity="0.25"/>
-    </svg>`;
+function slotColor(kind: Slot['kind'] | undefined, mode: RadialMode): string {
+  switch (kind) {
+    case 'parent':
+      return '#c9a84c';
+    case 'child':
+    case 'overflow':
+      return '#4ca8a0';
+    case 'sibling':
+      return '#bf5c7c';
+    case 'recent':
+      return '#6b6b78';
+    case 'cmd':
+      return '#9b7ce8';
+    default:
+      return mode === 'breadcrumbs' ? '#5a536a' : '#3d2d6b';
   }
-  return `<svg class="qw-dash-radial-guide" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="130" cy="130" r="100" fill="none" stroke="#3d2d6b" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>
+}
+
+function guideSvg(mode: RadialMode, slots: readonly (Slot | undefined)[]): string {
+  const activeSlots = slots
+    .map((slot, index) => ({ slot, pos: SLOTS[index] }))
+    .filter((item): item is { slot: Slot; pos: SlotPos } => Boolean(item.slot?.onTap && item.pos));
+
+  const spokes = activeSlots.map(({ slot, pos }) => {
+    const color = slotColor(slot.kind, mode);
+    return `<line x1="${STAGE_CENTER}" y1="${STAGE_CENTER}" x2="${pos.left}" y2="${pos.top}" stroke="${color}" stroke-width="1.25" stroke-dasharray="4 7" opacity="0.34"/>`;
+  }).join('');
+
+  const anchors = activeSlots.map(({ slot, pos }) => {
+    const color = slotColor(slot.kind, mode);
+    return `<circle cx="${pos.left}" cy="${pos.top}" r="4" fill="${color}" opacity="0.42"/>`;
+  }).join('');
+
+  return `<svg class="qw-dash-radial-guide" viewBox="0 0 ${STAGE_SIZE} ${STAGE_SIZE}" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="${STAGE_CENTER}" cy="${STAGE_CENTER}" r="${GUIDE_RADIUS}" fill="none" stroke="${slotColor(undefined, mode)}" stroke-width="1" stroke-dasharray="2 8" opacity="0.14"/>
+    ${spokes}
+    ${anchors}
   </svg>`;
 }
 
@@ -53,35 +82,34 @@ function renderCenter(center: HTMLElement, mode: RadialMode): void {
 }
 
 function renderSlot(stage: HTMLElement, pos: SlotPos, data: Slot | undefined, index: number): void {
+  if (!data?.onTap) return;
+
   const btn = stage.createEl('button', {
     attr: { 'data-qw-dash-radial-slot': String(index), type: 'button' },
-    cls: `qw-dash-radial-mini-btn qw-radial-slot-${data?.kind ?? 'empty'}`,
+    cls: `qw-dash-radial-mini-btn qw-radial-slot-${data.kind}`,
   });
   btn.style.setProperty('left', `${pos.left}px`, 'important');
   btn.style.setProperty('top', `${pos.top}px`, 'important');
-  if (!data?.onTap) btn.addClass('qw-dash-radial-mini-btn--ghost');
 
   const face = btn.createEl('span', { cls: 'qw-dash-radial-mini-face' });
-  if (data?.kind === 'overflow') {
+  if (data.kind === 'overflow') {
     face.createEl('span', { cls: 'qw-dash-radial-mini-arrow qw-radial-overflow-count', text: data.label });
     face.createEl('span', { cls: 'qw-dash-radial-mini-title', text: 'more' });
-  } else if (data?.arrow || data?.title) {
+  } else if (data.arrow || data.title) {
     if (data.arrow) face.createEl('span', { cls: 'qw-dash-radial-mini-arrow', text: data.arrow });
     if (data.title) face.createEl('span', { cls: 'qw-dash-radial-mini-title', text: data.title });
-  } else if (data?.icon) {
+  } else if (data.icon) {
     const iconEl = face.createEl('span', { cls: 'qw-dash-radial-mini-icon' });
     if (data.iconType === 'glyph') iconEl.setText(data.icon);
     else setIcon(iconEl, data.icon);
   }
 
-  if (data) btn.createEl('span', { cls: 'qw-dash-radial-mini-label', text: data.label });
-  if (data?.onTap) {
-    btn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      vibrate(8);
-      data.onTap!(event);
-    });
-  }
+  btn.createEl('span', { cls: 'qw-dash-radial-mini-label', text: data.label });
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    vibrate(8);
+    data.onTap!(event);
+  });
 }
 
 function buildSlots(mode: RadialMode, ctx: DashboardWidgetContext): (Slot | undefined)[] {
@@ -118,6 +146,7 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
   const card = root.createEl('div', { cls: 'qw-dash-radial-card' });
   let cancelPress: (() => void) | null = null;
   let centerTapTimer: number | null = null;
+  let suppressClickUntil = 0;
   let stopScrollSync: (() => void) | null = null;
 
   // The dashboard's scrollable container — `.qw-dash-scroll` (root's parent)
@@ -187,6 +216,7 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
 
   const beginPress = (event: PointerEvent): void => {
     event.preventDefault();
+    suppressClickUntil = Date.now() + 350;
     setExpanded(true);
     cancelPress = () => {
       cancelPress = null;
@@ -233,7 +263,17 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
       });
       renderCenter(compact, mode);
       if (interaction === 'tap-toggle') compact.addEventListener('click', () => { setExpanded(true); });
-      else compact.addEventListener('pointerdown', beginPress);
+      else {
+        compact.addEventListener('pointerdown', (event) => {
+          if (event.pointerType === 'mouse') return;
+          beginPress(event);
+        });
+        compact.addEventListener('click', (event) => {
+          event.stopPropagation();
+          if (Date.now() < suppressClickUntil) return;
+          setExpanded(true);
+        });
+      }
       compact.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
@@ -243,7 +283,7 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
     }
 
     const stage = card.createEl('div', { cls: 'qw-dash-radial-stage' });
-    stage.innerHTML = guideSvg(mode);
+    stage.innerHTML = guideSvg(mode, currentSlots);
 
     for (let i = 0; i < SLOTS.length; i++) {
       renderSlot(stage, SLOTS[i]!, currentSlots[i], i);
@@ -258,6 +298,8 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
       },
       cls: 'qw-dash-radial-expanded-center',
     });
+    center.style.setProperty('left', `${STAGE_CENTER}px`, 'important');
+    center.style.setProperty('top', `${STAGE_CENTER}px`, 'important');
     renderCenter(center, mode);
     center.addEventListener('click', (event) => {
       event.stopPropagation();

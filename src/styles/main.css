@@ -743,7 +743,7 @@
 }
 
 .qw-dash-radial-card--expanded {
-  min-height: 282px;
+  min-height: 252px;
 }
 
 .qw-dash-host .qw-dash-radial-compact-center,
@@ -768,8 +768,8 @@
 }
 
 .qw-dash-radial-stage {
-  width: 260px;
-  height: 260px;
+  width: 240px;
+  height: 240px;
   position: relative;
   flex: 0 0 auto;
   user-select: none;
@@ -784,24 +784,24 @@
   pointer-events: none;
 }
 
-.qw-dash-radial-compact-center,
-.qw-dash-radial-expanded-center {
+.qw-dash-host .qw-dash-radial-compact-center,
+.qw-dash-host .qw-dash-radial-expanded-center {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
 }
 
-.qw-dash-radial-expanded-center {
+.qw-dash-host .qw-dash-radial-expanded-center {
   position: absolute !important;
-  top: 130px;
-  left: 130px;
-  transform: translate(-50%, -50%);
-  z-index: 5;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 5 !important;
 }
 
 .qw-dash-radial-center-outer {
-  width: 68px;
-  height: 68px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   border: 1px solid rgba(155, 124, 232, 0.15);
   display: flex;
@@ -811,8 +811,8 @@
 }
 
 .qw-dash-radial-center-mid {
-  width: 54px;
-  height: 54px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background: #1a1428;
   border: 1.5px solid var(--qw-purple);
@@ -823,8 +823,8 @@
 }
 
 .qw-dash-radial-center-inner {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--qw-purple);
   box-shadow: 0 0 10px rgba(124, 92, 191, 0.7);
@@ -852,13 +852,13 @@
 }
 
 .qw-dash-radial-mini-btn--ghost {
-  opacity: 0.25;
+  opacity: 0;
   pointer-events: none;
 }
 
 .qw-dash-radial-mini-face {
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
@@ -931,7 +931,7 @@
   font-family: var(--qw-mono);
   font-size: 7px;
   line-height: 1.3;
-  max-width: 40px;
+  max-width: 44px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -951,7 +951,7 @@
   line-height: 1;
   text-transform: uppercase;
   color: #3e3e52;
-  max-width: 64px;
+  max-width: 72px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

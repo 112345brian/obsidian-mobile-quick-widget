@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — 2026-06-16
+
+### Fixed
+- Dashboard Radial Launcher now draws only real actionable slots, instead of rendering empty ghost controls and a misleading full ring when the active note has only one breadcrumb relation.
+- Desktop mouse and keyboard activation now opens the dashboard radial as a stable expanded view for inspection/use, while touch/pen press-hold still preserves release-to-select and release-elsewhere-to-collapse behavior.
+- Fixed the expanded radial center being pushed out of alignment by Obsidian button reset CSS; the center now stays centered under the active slot guide.
+
 ## 0.3.0 — 2026-06-16
 
 ### Breaking
