@@ -105,21 +105,24 @@ export class DashboardModal extends Modal {
 
     containerEl.addClass('qw-dash-container');
     modalEl.addClass('qw-dash-modal');
-    contentEl.addClass('qw-dash');
 
     modalEl.createEl('div', { cls: 'qw-dash-handle' });
 
+    // Explicit inner scroll container — don't rely on .modal-content scrolling
+    const scroll = contentEl.createEl('div', { cls: 'qw-dash-scroll' });
+    const inner = scroll.createEl('div', { cls: 'qw-dash' });
+
     const widgets = this.settings.dashboardWidgets ?? [];
 
-    this.renderCapture(contentEl);
-    this.renderTodaySection(contentEl);
+    this.renderCapture(inner);
+    this.renderTodaySection(inner);
 
     for (const widget of widgets) {
       if (!widget.enabled) continue;
       switch (widget.type) {
-        case 'continue': await this.renderContinue(contentEl); break;
-        case 'graph': this.renderGraph(contentEl); break;
-        case 'new-note': this.renderMoreActions(contentEl); break;
+        case 'continue': await this.renderContinue(inner); break;
+        case 'graph': this.renderGraph(inner); break;
+        case 'new-note': this.renderMoreActions(inner); break;
       }
     }
   }
@@ -413,6 +416,7 @@ export class DashboardModal extends Modal {
 
   private getRecentFiles(): TFile[] {
     const MAX = 4;
+    const activePath = this.app.workspace.getActiveFile()?.path;
     const continuePlug = getContinuePlugin(this.app);
     const paths =
       continuePlug && continuePlug.openedLog.length > 0
@@ -420,7 +424,7 @@ export class DashboardModal extends Modal {
         : this.app.workspace.getLastOpenFiles();
     return paths
       .map((p) => this.app.vault.getFileByPath(p))
-      .filter((f): f is TFile => f !== null && !this.isExcluded(f))
+      .filter((f): f is TFile => f !== null && f.path !== activePath && !this.isExcluded(f))
       .slice(0, MAX);
   }
 

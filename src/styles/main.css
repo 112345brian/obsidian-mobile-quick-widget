@@ -120,43 +120,37 @@
 .qw-dash-modal {
   width: 100% !important;
   max-width: 480px !important;
+  height: 88vh !important;
   max-height: 88vh !important;
   border-radius: 22px 22px 0 0 !important;
   margin: 0 !important;
-  overflow: hidden !important;
   position: relative !important;
   background: var(--qw-bg) !important;
+  /* No overflow: hidden — let modal-content scroll naturally */
 }
 
 .qw-dash-modal .modal-close-button {
   display: none !important;
 }
 
-.qw-dash-modal::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 240px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--qw-purple), transparent);
-  opacity: 0.5;
-  z-index: 10;
-  pointer-events: none;
-}
-
 .qw-dash-modal .modal-content {
   background: var(--qw-bg) !important;
   padding: 0 !important;
-  overflow-y: auto !important;
-  height: 88vh !important;
-  max-height: 88vh !important;
-  -webkit-overflow-scrolling: touch !important;
-  scrollbar-width: none !important;
+  position: relative !important;
+  height: 100% !important;
+  overflow: hidden !important;
 }
 
-.qw-dash-modal .modal-content::-webkit-scrollbar {
+/* Absolutely fill modal-content and own the scroll */
+.qw-dash-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.qw-dash-scroll::-webkit-scrollbar {
   display: none;
 }
 
