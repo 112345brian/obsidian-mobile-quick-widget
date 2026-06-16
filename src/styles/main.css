@@ -200,21 +200,6 @@
   color: var(--qw-text-muted);
 }
 
-.qw-dash-radial-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  color: var(--qw-purple-bright);
-  background: var(--qw-purple-dim);
-  border: 1px solid var(--qw-purple-border);
-  cursor: pointer;
-}
-.qw-dash-radial-btn:active { transform: scale(0.92); }
-.qw-dash-radial-btn svg { width: 15px; height: 15px; }
-
 /* ── Trash badge ── */
 
 .qw-dash-trash-badge {

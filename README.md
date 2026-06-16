@@ -26,7 +26,7 @@ Three modes on a single ring, switched by tapping the center node or the mode-ke
 
 **Connecting to the Dashboard**
 - Swipe down on the radial to open the Dashboard
-- A button on the Dashboard returns to the radial
+- The Dashboard's Radial Launcher expands into the radial section you choose
 - Both surfaces are stateless by default — each always opens fresh unless you enable "Remember last mode"
 
 ### Dashboard
@@ -148,7 +148,7 @@ Your widget's source files live wherever you like — there's no folder-scanning
 | Default mode | Which mode the radial opens in (default: Breadcrumbs) |
 | Dashboard radial section | Which radial section the dashboard launcher expands into |
 | Remember last mode | Reopen in whatever mode you last used, instead of the default |
-| Connect radial & dashboard | Enables the swipe-to-dashboard gesture and the return button |
+| Connect radial & dashboard | Enables the swipe-to-dashboard gesture |
 | Radial Commands | Six configurable slots for Commands mode (label, icon, icon type, action) |
 
 ---

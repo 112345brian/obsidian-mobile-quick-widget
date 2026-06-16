@@ -14,6 +14,7 @@
 - Dashboard **Radial Launcher** widget: a compact radial center button that expands into the preferred radial section while pressed; releasing without selecting collapses it back down.
 
 ### Fixed
+- Removed the redundant dashboard header compass button now that the dashboard has the Radial Launcher widget as its radial entry point.
 - Existing dashboard configs that had **Active Cluster graph** enabled now migrate to the **Radial Launcher** widget, with the old graph left disabled. This keeps upgraded installs aligned with the new default dashboard layout instead of preserving the stale graph-heavy view.
 - Dashboard modal styling now forces an opaque dark background on the modal shell, content root, and backdrop so note text no longer bleeds through under transparent Obsidian/theme modal styles.
 - The dashboard's "Needs Review" widget toggle was dead — `trash` was never a real dashboard widget (only a Pulse Card), so enabling it did nothing. Removed it from presets; the working Pulse Card version is unaffected.
@@ -38,7 +39,7 @@
   - **Commands mode**: six fully configurable slots (new **Radial Commands** settings section), reusing the existing Quick Action editor. Icons support either a Lucide icon name or a literal glyph (explicit toggle, not inferred).
   - **Recents mode**: last 6 opened notes, sharing the same recents source as the dashboard.
   - New command: **"Open Radial Menu"** (replaces "Open Quick Menu").
-- **Radial ↔ Dashboard hand-off** — swipe down on the radial to open the dashboard; a compass button on the dashboard returns to the radial. Both gated by a new **Connect radial & dashboard** setting (on by default). Stateless: each surface always opens fresh unless **Remember last mode** is explicitly enabled.
+- **Radial ↔ Dashboard hand-off** — swipe down on the radial to open the dashboard, with dashboard-side radial access handled by the Radial Launcher widget. Both are gated by **Connect radial & dashboard** (on by default). Stateless: each surface always opens fresh unless **Remember last mode** is explicitly enabled.
 - New settings: **Default mode**, **Remember last mode**, **Connect radial & dashboard**, **Radial Commands** (six slots).
 
 ### Changed

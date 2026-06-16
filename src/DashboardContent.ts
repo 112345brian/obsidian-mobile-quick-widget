@@ -210,16 +210,6 @@ export class DashboardContent {
     const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
     dateRow.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
 
-    // Reverse hand-off to the radial menu (decoupled via command dispatch).
-    if (this.settings.connectSurfaces) {
-      const radialBtn = dateRow.createEl('div', { cls: 'qw-dash-radial-btn', attr: { 'aria-label': 'Open radial menu' } });
-      setIcon(radialBtn, 'compass');
-      radialBtn.addEventListener('click', () => {
-        this.close();
-        this.app.commands.executeCommandById('readyboard:open-radial-menu');
-      });
-    }
-
     const cards = (this.settings.pulseCards ?? []).filter((c) => c.enabled);
     if (cards.length === 0) return;
 
