@@ -1,7 +1,7 @@
 import type { App, TFile } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
-import { Menu, setIcon } from 'obsidian';
+import { Menu, Platform, setIcon } from 'obsidian';
 
 import type { DashboardWidget, PulseCard, PluginSettings, QuickAction } from './PluginSettings.ts';
 import type { DashboardWidgetContext, DashboardWidgetRegistry } from './DashboardWidgetApi.ts';
@@ -157,10 +157,8 @@ export class DashboardContent {
     const inner = scroll.createEl('div', { cls: 'qw-dash' });
     if (this.settings.handedness === 'right') inner.addClass('qw-dash--right');
 
-    // Overdrag-to-new-note indicator (hidden above content until pulled)
-    const overdragEnabled = this.settings.enableOverdrag !== false;
-    const overdrag = inner.createEl('div', { cls: 'qw-overdrag' });
-    overdrag.createEl('div', { cls: 'qw-overdrag-icon', text: '+' });
+    // Overdrag-to-new-note: touch-only gesture, skip entirely on desktop.
+    const overdragEnabled = Platform.isMobile && this.settings.enableOverdrag !== false;
 
     const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.widgetRegistry.ids()])];
     const widgets = normalizeDashboardWidgets((this.settings.dashboardWidgets ?? []) as readonly DashboardWidget[], knownIds);
@@ -188,7 +186,11 @@ export class DashboardContent {
       }
     }
 
-    if (overdragEnabled) this.attachOverdrag(host, overdrag);
+    if (overdragEnabled) {
+      const overdrag = inner.createEl('div', { cls: 'qw-overdrag' });
+      overdrag.createEl('div', { cls: 'qw-overdrag-icon', text: '+' });
+      this.attachOverdrag(host, overdrag);
+    }
     this.attachKeyNav(host);
 
     // Re-render when the sidebar is resized across the 2/3-column threshold.
