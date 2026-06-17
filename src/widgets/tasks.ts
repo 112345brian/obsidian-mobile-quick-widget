@@ -18,11 +18,15 @@ interface TaskInfo {
   priority?: string;
 }
 
+interface TaskNotesEvents {
+  on(event: string, handler: () => void): unknown;
+  off(ref: unknown): void;
+}
+
 interface TaskNotesApi {
   apiVersion: number;
   listTasks(query?: Record<string, unknown>): Promise<TaskInfo[]>;
-  on(event: string, handler: () => void): unknown;
-  off(ref: unknown): void;
+  events: TaskNotesEvents;
 }
 
 interface TaskNotesPlugin {
@@ -34,6 +38,7 @@ const DONE_STATUSES = new Set(['done', 'completed', 'cancelled', 'canceled']);
 function getTaskNotesApi(ctx: DashboardWidgetContext): TaskNotesApi | null {
   const api = ctx.getPlugin<TaskNotesPlugin>('tasknotes')?.api;
   if (!api || typeof api.listTasks !== 'function') return null;
+  if (!api.events || typeof api.events.on !== 'function') return null;
   return api;
 }
 
@@ -137,18 +142,15 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
 
     void draw();
 
-    // Re-draw when tasks change. Event names are best-effort — if the
-    // version of TaskNotes installed uses different names the subscription
-    // is silently skipped and the list stays correct on next dashboard open.
-    try {
-      const handler = (): void => { void draw(); };
-      const refs = [
-        api.on('task:created', handler),
-        api.on('task:updated', handler),
-        api.on('task:deleted', handler),
-      ];
-      ctx.onCleanup(() => { for (const ref of refs) api.off(ref); });
-    } catch { /* event API unavailable — no live updates */ }
+    // Re-draw when tasks change. Events are on api.events (not api directly);
+    // names use dot notation per TaskNotes v4 internals.
+    const handler = (): void => { void draw(); };
+    const refs = [
+      api.events.on('task.created', handler),
+      api.events.on('task.updated', handler),
+      api.events.on('task.deleted', handler),
+    ];
+    ctx.onCleanup(() => { for (const ref of refs) api.events.off(ref); });
 
   } else {
     // Fallback: scan markdown checkboxes in the vault.
