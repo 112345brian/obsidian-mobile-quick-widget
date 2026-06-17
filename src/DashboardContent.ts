@@ -9,6 +9,7 @@ import type { DashboardWidgetContext, DashboardWidgetRegistry } from './Dashboar
 import { createNote } from './createNote.ts';
 import { getExternalPlugin } from './externalPlugin.ts';
 import { vibrate } from './haptics.ts';
+import { getModifiedTime } from './notes.ts';
 import { BUILTIN_DASHBOARD_WIDGET_TYPES, normalizeDashboardWidgets } from './PluginSettings.ts';
 import { executeQuickAction } from './quickActions.ts';
 import { radialLauncherWidget } from './widgets/radialLauncher.ts';
@@ -165,7 +166,15 @@ export class DashboardContent {
     const widgets = normalizeDashboardWidgets((this.settings.dashboardWidgets ?? []) as readonly DashboardWidget[], knownIds);
 
     const ctx = this.widgetContext();
-    this.renderTodaySection(inner, ctx, widgets);
+    // getBoundingClientRect is more reliable than offsetWidth for containers
+    // inside CSS-animated modals; fall back to offsetWidth for cases where
+    // the sidebar leaf isn't the active tab (both return 0 for display:none,
+    // which the ResizeObserver corrects once the element becomes visible).
+    const colsFor = (el: HTMLElement): number => {
+      const w = el.getBoundingClientRect().width || el.offsetWidth;
+      return w >= 260 ? 3 : 2;
+    };
+    this.renderTodaySection(inner, ctx, widgets, colsFor(inner));
 
     for (const widget of widgets) {
       if (!widget.enabled) continue;
@@ -183,7 +192,6 @@ export class DashboardContent {
     this.attachKeyNav(host);
 
     // Re-render when the sidebar is resized across the 2/3-column threshold.
-    const colsFor = (el: HTMLElement): number => el.offsetWidth >= 260 ? 3 : 2;
     let lastCols = colsFor(inner);
     let rafId = 0;
     const ro = new ResizeObserver(() => {
@@ -265,7 +273,7 @@ export class DashboardContent {
 
   // ── Today section (date header + pulse grid) — fixed chrome, not a widget ──
 
-  private renderTodaySection(root: HTMLElement, ctx: DashboardWidgetContext, normalizedWidgets: DashboardWidget[]): void {
+  private renderTodaySection(root: HTMLElement, ctx: DashboardWidgetContext, normalizedWidgets: DashboardWidget[], cols: number): void {
     const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
     dateRow.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
 
@@ -301,15 +309,12 @@ export class DashboardContent {
     });
 
     const grid = root.createEl('div', { cls: 'qw-dash-pulse-grid' });
+    // grid-template-columns is set from the caller-measured cols (see render()).
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     const pctx = { allFiles, today, trashApi, trashCount, streak, inboxCount };
 
-    // Responsive column count: narrow containers (e.g. sidebar) use 2, wide use 3.
-    // offsetWidth is valid here because root is already in the live document.
-    const COLS = grid.offsetWidth >= 260 ? 3 : 2;
-    grid.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
-
     // Radial anchored at (col=2, row=2) — sits in the last column of row 2 when 2-col.
-    const RADIAL_COL = Math.min(2, COLS);
+    const RADIAL_COL = Math.min(2, cols);
 
     let row = 1;
     let col = 1;
@@ -317,17 +322,17 @@ export class DashboardContent {
     let rightFlankerEl: HTMLElement | null = null;
 
     for (const card of visibleCards) {
-      const span = Math.min(card.size ?? 1, COLS); // clamp span to column count
+      const span = Math.min(card.size ?? 1, cols); // clamp span to column count
 
       // Wrap to next row if span doesn't fit
-      if (col + span - 1 > COLS) { row++; col = 1; }
+      if (col + span - 1 > cols) { row++; col = 1; }
 
       // Radial row (row 2) constraints: only span-1 cards can flank; skip RADIAL_COL
       if (radialEnabled && row === 2) {
         if (col === 1 && span > 1) { row++; col = 1; }       // wide cards can't flank — push below
         else if (col === RADIAL_COL) {
           col = RADIAL_COL + 1;
-          if (col > COLS || span > 1) { row++; col = 1; }    // no room — push to next row
+          if (col > cols || span > 1) { row++; col = 1; }    // no room — push to next row
         }
       }
 
@@ -337,10 +342,11 @@ export class DashboardContent {
       this.populatePulseCard(el, card, pctx, ctx);
 
       if (radialEnabled && row === 2 && col === 1) leftFlankerEl = el;
-      if (radialEnabled && row === 2 && col === COLS) rightFlankerEl = el;
+      // Right flanker only exists when the radial isn't in the last column (i.e. 3-col mode).
+      if (radialEnabled && row === 2 && col === cols && RADIAL_COL < cols) rightFlankerEl = el;
 
       col += span;
-      if (col > COLS) { col = 1; row++; }
+      if (col > cols) { col = 1; row++; }
     }
 
     if (radialEnabled) {
@@ -379,7 +385,7 @@ export class DashboardContent {
         break;
       }
       case 'modified-today': {
-        const count = ctx.allFiles.filter((f) => this.getModifiedTime(f) >= ctx.today.getTime()).length;
+        const count = ctx.allFiles.filter((f) => getModifiedTime(this.app, this.settings, f) >= ctx.today.getTime()).length;
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Modified' });
         el.createEl('div', { cls: 'qw-dash-pulse-value', text: String(count) });
         el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'notes today' });
@@ -492,20 +498,6 @@ export class DashboardContent {
         break;
       }
     }
-  }
-
-  private getModifiedTime(file: TFile): number {
-    const field = this.settings.modifiedDateField;
-    if (field) {
-      const val = this.app.metadataCache.getFileCache(file)?.frontmatter?.[field] as unknown;
-      if (val instanceof Date) return val.getTime();
-      if (typeof val === 'number' && val > 1e11) return val; // looks like a ms epoch timestamp
-      if (typeof val === 'string') {
-        const t = Date.parse(val);
-        if (!isNaN(t)) return t;
-      }
-    }
-    return file.stat.mtime;
   }
 
   // ── Overdrag gesture ──────────────────────────────────────────────────────

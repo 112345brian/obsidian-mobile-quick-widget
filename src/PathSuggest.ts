@@ -11,6 +11,9 @@ function allFolders(app: App): TFolder[] {
 /** Suggests vault folder paths as you type. */
 export class FolderSuggest extends AbstractInputSuggest<TFolder> {
   private el: HTMLInputElement;
+  /** Set to true in selectSuggestion so the input listener can distinguish
+   *  a picker selection from manual typing without re-scanning the vault. */
+  justSelected = false;
 
   constructor(app: App, inputEl: HTMLInputElement) {
     super(app, inputEl);
@@ -30,6 +33,7 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
   }
 
   override selectSuggestion(folder: TFolder, _evt: MouseEvent | KeyboardEvent): void {
+    this.justSelected = true;
     this.setValue(folder.path);
     this.el.dispatchEvent(new Event('input'));
     this.close();
@@ -39,6 +43,9 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
 /** Suggests vault markdown file paths as you type. */
 export class FileSuggest extends AbstractInputSuggest<TFile> {
   private el: HTMLInputElement;
+  /** Set to true in selectSuggestion so the input listener can distinguish
+   *  a picker selection from manual typing without re-scanning the vault. */
+  justSelected = false;
 
   constructor(app: App, inputEl: HTMLInputElement) {
     super(app, inputEl);
@@ -58,6 +65,7 @@ export class FileSuggest extends AbstractInputSuggest<TFile> {
   }
 
   override selectSuggestion(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
+    this.justSelected = true;
     this.setValue(file.path);
     this.el.dispatchEvent(new Event('input'));
     this.close();
@@ -101,21 +109,19 @@ export function renderChipList(
 
   const suggest = suggestFolders ? new FolderSuggest(app, input) : new FileSuggest(app, input);
 
-  // When the user picks a suggestion, it fills the input — treat that as an add.
+  // When the user picks a suggestion, selectSuggestion sets justSelected=true
+  // then dispatches 'input'. We consume the flag here to auto-add the chip
+  // without re-scanning the vault (which would cause false positives for
+  // manually typed paths that happen to match a vault entry).
   input.addEventListener('input', () => {
-    // Only auto-add when the value exactly matches a vault path (i.e. was set
-    // by selectSuggestion), not while the user is still typing.
+    if (!suggest.justSelected) return;
+    suggest.justSelected = false;
     const val = input.value.trim();
-    const isExactFolder = suggestFolders
-      ? allFolders(app).some((f) => f.path === val)
-      : app.vault.getMarkdownFiles().some((f) => f.path === val);
-    if (isExactFolder) {
-      if (val && !getValues().includes(val)) {
-        setValues([...getValues(), val]);
-        redrawChips();
-      }
-      input.value = '';
+    if (val && !getValues().includes(val)) {
+      setValues([...getValues(), val]);
+      redrawChips();
     }
+    input.value = '';
   });
 
   function addValue(): void {

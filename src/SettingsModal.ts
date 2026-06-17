@@ -39,6 +39,12 @@ export class ReadyBoardSettingsModal extends Modal {
   }
 
   override onOpen(): void {
+    // Normalize widget ids on open so any tab's save flushes clean data,
+    // not just when the Dashboard tab is opened.
+    const s = this.plugin.settings as PluginSettings;
+    const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.plugin.dashboardWidgetRegistry.ids()])];
+    s.dashboardWidgets = normalizeDashboardWidgets(s.dashboardWidgets as DashboardWidget[], knownIds);
+
     this.modalEl.addClass('qw-settings-modal');
     this.titleEl.setText('ReadyBoard Settings');
 
@@ -289,16 +295,22 @@ export class ReadyBoardSettingsModal extends Modal {
         .onChange((v) => { s.modifiedDateField = v.trim(); save(); }));
 
     el.createEl('h3', { text: 'Widgets' });
+    const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.plugin.dashboardWidgetRegistry.ids()])];
+
     const presetSetting = new Setting(el).setName('Presets');
     for (const preset of Object.values(DASHBOARD_PRESETS) as Array<{ label: string; widgets: DashboardWidget[] }>) {
       presetSetting.addButton((btn) => btn.setButtonText(preset.label).onClick(() => {
-        s.dashboardWidgets = preset.widgets.map((w) => ({ type: w.type, enabled: w.enabled }));
+        s.dashboardWidgets = normalizeDashboardWidgets(
+          preset.widgets.map((w) => ({ type: w.type, enabled: w.enabled })),
+          knownIds,
+        );
         save(); this.redraw();
       }));
     }
 
-    const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.plugin.dashboardWidgetRegistry.ids()])];
     const widgets = normalizeDashboardWidgets(s.dashboardWidgets as DashboardWidget[], knownIds);
+    // Point s.dashboardWidgets at the same array so that toggle/reorder
+    // mutations in the handlers below are captured by save().
     s.dashboardWidgets = widgets;
 
     for (let i = 0; i < widgets.length; i++) {
