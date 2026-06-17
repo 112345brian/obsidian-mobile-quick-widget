@@ -1,15 +1,26 @@
-import { AbstractInputSuggest, App, TFile, TFolder } from 'obsidian';
+import { AbstractInputSuggest, App, TAbstractFile, TFile, TFolder } from 'obsidian';
+
+function allFolders(app: App): TFolder[] {
+  const folders: TFolder[] = [];
+  app.vault.getAllLoadedFiles().forEach((f: TAbstractFile) => {
+    if (f instanceof TFolder && f.path !== '/') folders.push(f);
+  });
+  return folders;
+}
 
 /** Suggests vault folder paths as you type. */
 export class FolderSuggest extends AbstractInputSuggest<TFolder> {
+  private el: HTMLInputElement;
+
   constructor(app: App, inputEl: HTMLInputElement) {
     super(app, inputEl);
+    this.el = inputEl;
   }
 
   override getSuggestions(query: string): TFolder[] {
     const lower = query.toLowerCase();
-    return this.app.vault.getAllFolders(true)
-      .filter((f) => f.path !== '/' && f.path.toLowerCase().includes(lower))
+    return allFolders(this.app)
+      .filter((f) => !lower || f.path.toLowerCase().includes(lower))
       .sort((a, b) => a.path.localeCompare(b.path))
       .slice(0, 20);
   }
@@ -18,22 +29,26 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
     el.setText(folder.path);
   }
 
-  override selectSuggestion(folder: TFolder): void {
+  override selectSuggestion(folder: TFolder, _evt: MouseEvent | KeyboardEvent): void {
     this.setValue(folder.path);
+    this.el.dispatchEvent(new Event('input'));
     this.close();
   }
 }
 
-/** Suggests vault file paths (markdown only) as you type. */
+/** Suggests vault markdown file paths as you type. */
 export class FileSuggest extends AbstractInputSuggest<TFile> {
+  private el: HTMLInputElement;
+
   constructor(app: App, inputEl: HTMLInputElement) {
     super(app, inputEl);
+    this.el = inputEl;
   }
 
   override getSuggestions(query: string): TFile[] {
     const lower = query.toLowerCase();
     return this.app.vault.getMarkdownFiles()
-      .filter((f) => f.path.toLowerCase().includes(lower))
+      .filter((f) => !lower || f.path.toLowerCase().includes(lower))
       .sort((a, b) => a.path.localeCompare(b.path))
       .slice(0, 20);
   }
@@ -42,16 +57,15 @@ export class FileSuggest extends AbstractInputSuggest<TFile> {
     el.setText(file.path);
   }
 
-  override selectSuggestion(file: TFile): void {
+  override selectSuggestion(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
     this.setValue(file.path);
+    this.el.dispatchEvent(new Event('input'));
     this.close();
   }
 }
 
 /**
  * Renders a chip-list input for a string[] setting (e.g. excluded paths).
- * Each existing value shows as a removable chip. A text input with folder
- * suggestions lets the user add new entries without typing them manually.
  */
 export function renderChipList(
   container: HTMLElement,
@@ -86,6 +100,23 @@ export function renderChipList(
   const addBtn = inputRow.createEl('button', { text: 'Add', cls: 'qw-chip-add-btn' });
 
   const suggest = suggestFolders ? new FolderSuggest(app, input) : new FileSuggest(app, input);
+
+  // When the user picks a suggestion, it fills the input — treat that as an add.
+  input.addEventListener('input', () => {
+    // Only auto-add when the value exactly matches a vault path (i.e. was set
+    // by selectSuggestion), not while the user is still typing.
+    const val = input.value.trim();
+    const isExactFolder = suggestFolders
+      ? allFolders(app).some((f) => f.path === val)
+      : app.vault.getMarkdownFiles().some((f) => f.path === val);
+    if (isExactFolder) {
+      if (val && !getValues().includes(val)) {
+        setValues([...getValues(), val]);
+        redrawChips();
+      }
+      input.value = '';
+    }
+  });
 
   function addValue(): void {
     const val = input.value.trim();
