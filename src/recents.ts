@@ -5,8 +5,14 @@ import type {
 import { getExternalPlugin } from './externalPlugin.ts';
 
 // Continue plugin exposes a navigation log richer than Obsidian's own list.
+interface ContinueNoteApi {
+  getRecentPaths(limit?: number): string[];
+  version: number;
+}
+
 interface ContinuePlugin {
-  openedLog: string[];
+  api?: ContinueNoteApi;
+  openedLog?: string[];
 }
 
 /**
@@ -17,9 +23,9 @@ interface ContinuePlugin {
  */
 export function getRecentFiles(app: App, excluded: readonly string[], max: number): TFile[] {
   const activePath = app.workspace.getActiveFile()?.path;
-  const continuePlug = getContinuePlugin(app);
-  const paths = continuePlug && continuePlug.openedLog.length > 0
-    ? continuePlug.openedLog
+  const continuePaths = getContinueRecentPaths(app);
+  const paths = continuePaths && continuePaths.length > 0
+    ? continuePaths
     : app.workspace.getLastOpenFiles();
   return paths
     .map((p) => app.vault.getFileByPath(p))
@@ -35,8 +41,11 @@ export function isExcluded(file: TFile, excluded: readonly string[]): boolean {
   );
 }
 
-function getContinuePlugin(app: App): ContinuePlugin | null {
+function getContinueRecentPaths(app: App): null | string[] {
   const plugin = getExternalPlugin<ContinuePlugin>(app, 'obsidian-continue');
-  if (!plugin || !Array.isArray(plugin.openedLog)) { return null; }
-  return plugin;
+  if (!plugin) { return null; }
+  if (plugin.api?.version === 1 && typeof plugin.api.getRecentPaths === 'function') {
+    return plugin.api.getRecentPaths();
+  }
+  return Array.isArray(plugin.openedLog) ? plugin.openedLog : null;
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.7 — 2026-06-17
+
+### Changed
+- ReadyBoard now prefers the public `obsidian-continue` API for recent-note history instead of reading `openedLog` directly, with a compatibility fallback for older Continue installs.
+- The References pulse card now prefers Bripey Citation Suite's public API for citekey detection and reference-panel focus, with a command/parser fallback for older Citation Suite installs.
+
 ## 0.3.6 — 2026-06-17
 
 ### Added

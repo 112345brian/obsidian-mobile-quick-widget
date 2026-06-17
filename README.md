@@ -65,7 +65,7 @@ An opaque bottom-sheet modal with modular widgets:
 - Git status *(conditional)* — changed file count; tap to commit-and-sync or open git menu. Appears only when Obsidian Git is ready.
 - Inbox *(conditional)* — count of files in a configured folder. Appears only when count > 0.
 - Pomodoro *(conditional, reactive)* — live countdown + mode. Appears while a session is active or recently used.
-- References *(conditional)* — citekey count for the active note. Appears only when citekeys are detected and opens Bripey Citation Suite's reference list.
+- References *(conditional)* — citekey count for the active note. Appears only when citekeys are detected and opens Bripey Citation Suite's reference list. Uses Bripey Citation Suite's public API when available.
 - Homepage — opens your configured home note
 - Quick action — runs any configured action
 
@@ -214,7 +214,8 @@ The plugin gracefully degrades when these aren't installed:
 
 - **Breadcrumbs** — powers the graph relation layout and breadcrumb parent display
 - **Bread-trail** — same; reads `up`/`down`/`next`/`prev` frontmatter edges
-- **Continue** — supplies the Touched list with richer navigation history
+- **Continue** — supplies the Touched list with richer navigation history through its public API
+- **Bripey Citation Suite** — supplies citekey detection and reference-list focus through its public API for the References pulse card
 - **Templater** — processes template syntax after new note creation
 - **Homepage** — fallback for the Homepage pulse card
 - **Pomodoro Timer** — powers the Pomodoro pulse card (live countdown, only surfaces when a session is active)

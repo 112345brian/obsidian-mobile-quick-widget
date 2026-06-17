@@ -26,6 +26,12 @@ import { radialLauncherWidget } from './widgets/radialLauncher.ts';
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
+interface BripeyCitationSuiteApi {
+  focusReferenceListView(): Promise<void> | void;
+  getCitekeysForFile(file?: TFile): Promise<string[]>;
+  version: number;
+}
+
 interface GitPlugin {
   cachedStatus?: GitStatus;
   gitReady: boolean;
@@ -360,6 +366,15 @@ export class DashboardContent {
     const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) { return { activeFile: null, citekeys: [] }; }
 
+    const citationApi = getCitationSuiteApi(this.app);
+    if (citationApi) {
+      try {
+        return { activeFile, citekeys: await citationApi.getCitekeysForFile(activeFile) };
+      } catch (error) {
+        console.warn('ReadyBoard: failed to read references from Bripey Citation Suite API', error);
+      }
+    }
+
     try {
       const markdown = await this.app.vault.cachedRead(activeFile);
       return { activeFile, citekeys: extractCitekeys(markdown) };
@@ -500,6 +515,13 @@ export class DashboardContent {
         el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--accent', text: String(count) });
         el.createEl('div', { cls: 'qw-dash-pulse-sub', text: `citekey${count === 1 ? '' : 's'}` });
         el.addEventListener('click', () => {
+          const citationApi = getCitationSuiteApi(this.app);
+          if (citationApi) {
+            void Promise.resolve(citationApi.focusReferenceListView()).catch((error) => {
+              console.warn('ReadyBoard: failed to focus Bripey Citation Suite reference list', error);
+            });
+            return;
+          }
           const commandId = 'bripey-citation-suite:focus-reference-list-view';
           if (this.app.commands.findCommand(commandId)) {
             this.app.commands.executeCommandById(commandId);
@@ -769,6 +791,15 @@ function extractCitekeys(markdown: string): string[] {
     if (key) { keys.add(key); }
   }
   return [...keys];
+}
+
+function getCitationSuiteApi(app: App): BripeyCitationSuiteApi | null {
+  const plugin = getExternalPlugin<{ api?: BripeyCitationSuiteApi }>(app, 'bripey-citation-suite');
+  const api = plugin?.api;
+  if (api?.version !== 1) { return null; }
+  if (typeof api.focusReferenceListView !== 'function') { return null; }
+  if (typeof api.getCitekeysForFile !== 'function') { return null; }
+  return api;
 }
 
 function getImmediatePomodoroState(timer: null | PomodoroTimer): null | TimerStore {
