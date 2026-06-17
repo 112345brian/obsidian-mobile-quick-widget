@@ -531,6 +531,11 @@
   flex-shrink: 0;
 }
 
+.qw-dash-task-src--overdue {
+  color: #e05252;
+  opacity: 1;
+}
+
 .qw-dash-task-loading {
   padding: 12px;
   font-size: 11px;
