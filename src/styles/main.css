@@ -197,7 +197,7 @@
   font-size: 9px;
   font-weight: 500;
   letter-spacing: 0.12em;
-  color: var(--qw-text-muted);
+  color: var(--qw-text-primary);
 }
 
 /* ── Trash badge ── */
