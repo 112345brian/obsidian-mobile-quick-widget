@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.2 — 2026-06-16
+
+### Added
+- **3-column pulse grid** — pulse cards now live in a 3-column CSS grid. The Radial Launcher is embedded as a fixed anchor at column 2, row 2 (so expansion is always vertically centered). Cards flank it left and right; when the radial expands it takes the full row and flanking cards fade out, then return when it collapses.
+- **Pulse card column span** — each pulse card can be set to 1, 2, or 3 columns wide. Span-2/3 cards that would collide with the radial slot are pushed to the next row automatically.
+- **Streak pulse card** — consecutive days with at least one file modified. Shows count + "days" sub-label.
+- **Inbox pulse card** (conditional) — count of markdown files inside a configurable folder path. Only appears when count > 0. Configure path in Settings → Pulse Cards → Inbox folder path.
+- **Pomodoro pulse card** (conditional, reactive) — shows live countdown and mode (focus/break) when a Pomodoro session is actively running. Disappears when idle. Subscribes to the Pomodoro Timer plugin's own store; no polling.
+- **Note Card settings section** — controls what each note row shows: breadcrumb parent, tags, backlink count, preview text, and extra frontmatter fields to surface per-note.
+- Backlink count moved inline with the date on the note title row (was its own line). Toggled by the new "Show backlink count" setting.
+
+### Changed
+- **Git Status moved from dashboard widget to conditional pulse card** — removed the `git.ts` widget; git status now lives in the pulse grid where it belongs. Tap to commit-and-sync (default) or show a git command menu (configurable).
+- `cardShowTags` now defaults to `false`.
+
 ## 0.3.1 — 2026-06-16
 
 ### Fixed

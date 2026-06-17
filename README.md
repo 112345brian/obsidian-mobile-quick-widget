@@ -57,12 +57,18 @@ An opaque bottom-sheet modal with modular widgets:
 - Scans vault for unchecked `- [ ]` items, shows up to 10 with source note
 - Tappable to jump to the note
 
-**Pulse cards** *(configurable row of stat cards)*
+**Pulse cards** *(3-column grid of stat cards, with the Radial Launcher anchored at center)*
 - Daily note — jump to today
 - Modified today — count of files changed today
 - Vault stats — note and link counts
+- Streak — consecutive days with at least one file modified
+- Git status *(conditional)* — changed file count; tap to commit-and-sync or open git menu. Appears only when Obsidian Git is ready.
+- Inbox *(conditional)* — count of files in a configured folder. Appears only when count > 0.
+- Pomodoro *(conditional, reactive)* — live countdown + mode. Appears only when a session is actively running.
 - Homepage — opens your configured home note
 - Quick action — runs any configured action
+
+Each card has a column-span setting (1, 2, or 3 columns). Span-wide cards that would collide with the radial slot are pushed to the next row.
 
 **Overdrag to new note**
 - Pull down past the top of the dashboard scroll, release to instantly create a new note
@@ -70,10 +76,6 @@ An opaque bottom-sheet modal with modular widgets:
 
 **Pomodoro Timer** *(widget, off by default — appears only if [Pomodoro Timer](https://github.com/eatgrass/obsidian-pomodoro-timer) is installed)*
 - Live countdown, current mode (Focus/Break), tap to start/pause
-
-**Git Status** *(widget, off by default — appears only if [Obsidian Git](https://github.com/Vinzent03/obsidian-git) is installed)*
-- Current branch, changed/staged file count, conflict warning
-- Tap to commit-and-sync
 
 ---
 
@@ -133,6 +135,15 @@ Your widget's source files live wherever you like — there's no folder-scanning
 | Filename format | Untitled + date, Zettelkasten (YYYYMMDDHHmmss), or Custom |
 | Custom format | Token-based: `YYYY` `YY` `MM` `DD` `HH` `mm` `ss` — e.g. `YYMMDD_HHmmss` |
 
+### Note Card
+| Setting | Description |
+|---|---|
+| Show breadcrumb parent | Show the parent note above each card title |
+| Show tags | Show frontmatter tags below the title row |
+| Show backlink count | Show `← N` inline with the date |
+| Show preview | Show a short text excerpt from the note body |
+| Extra frontmatter fields | Fields to surface per-note when present (e.g. `status`, `type`) |
+
 ### Dashboard
 | Setting | Description |
 |---|---|
@@ -143,6 +154,13 @@ Your widget's source files live wherever you like — there's no folder-scanning
 | Breadcrumb field override | Custom frontmatter field for parent (default: `up`) |
 | Modified date field | Frontmatter field for modified date (default: file mtime) |
 | Continue — excluded paths | Files/folders to hide from the Touched list |
+
+### Pulse Cards
+| Setting | Description |
+|---|---|
+| Per-card column span | 1, 2, or 3 columns in the pulse grid |
+| Inbox folder path | Folder to count for the Inbox pulse card |
+| Git card tap action | Commit-and-sync (default) or open git command menu |
 
 ### Radial Menu
 | Setting | Description |
@@ -180,8 +198,8 @@ The plugin gracefully degrades when these aren't installed:
 - **Continue** — supplies the Touched list with richer navigation history
 - **Templater** — processes template syntax after new note creation
 - **Homepage** — fallback for the Homepage pulse card
-- **Pomodoro Timer** — powers the Pomodoro dashboard widget (live countdown, tap to start/pause)
-- **Obsidian Git** — powers the Git Status dashboard widget (branch, change count, tap to commit-and-sync)
+- **Pomodoro Timer** — powers the Pomodoro pulse card (live countdown, only surfaces when a session is active)
+- **Obsidian Git** — powers the Git Status pulse card (change count, tap to commit-and-sync or open git menu)
 
 ---
 

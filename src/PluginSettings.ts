@@ -171,7 +171,7 @@ export class PluginSettings {
   public radialCommands: QuickAction[] = RADIAL_COMMAND_DEFAULTS.map((c) => ({ ...c }));
   public dashboardSidebarSide: 'left' | 'right' = 'right';
   public gitPulseCardAction: 'sync' | 'menu' = 'sync';
-  public cardShowTags = true;
+  public cardShowTags = false;
   public cardShowPreview = true;
   public cardShowBacklinks = true;
   public cardFrontmatterFields: string[] = [];
