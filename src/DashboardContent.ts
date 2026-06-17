@@ -181,6 +181,21 @@ export class DashboardContent {
 
     if (overdragEnabled) this.attachOverdrag(host, overdrag);
     this.attachKeyNav(host);
+
+    // Re-render when the sidebar is resized across the 2/3-column threshold.
+    const colsFor = (el: HTMLElement): number => el.offsetWidth >= 260 ? 3 : 2;
+    let lastCols = colsFor(inner);
+    let rafId = 0;
+    const ro = new ResizeObserver(() => {
+      const next = colsFor(inner);
+      if (next !== lastCols) {
+        lastCols = next;
+        cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => { void this.render(host); });
+      }
+    });
+    ro.observe(inner);
+    this.cleanupFns.push(() => { ro.disconnect(); cancelAnimationFrame(rafId); });
   }
 
   private attachKeyNav(host: HTMLElement): void {
@@ -288,25 +303,31 @@ export class DashboardContent {
     const grid = root.createEl('div', { cls: 'qw-dash-pulse-grid' });
     const pctx = { allFiles, today, trashApi, trashCount, streak, inboxCount };
 
-    // 3-column grid layout. Radial anchored at (col=2, row=2).
-    // Cards fill around it; the radial slot is always skipped when placing cards.
+    // Responsive column count: narrow containers (e.g. sidebar) use 2, wide use 3.
+    // offsetWidth is valid here because root is already in the live document.
+    const COLS = grid.offsetWidth >= 260 ? 3 : 2;
+    grid.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+
+    // Radial anchored at (col=2, row=2) — sits in the last column of row 2 when 2-col.
+    const RADIAL_COL = Math.min(2, COLS);
+
     let row = 1;
     let col = 1;
     let leftFlankerEl: HTMLElement | null = null;
     let rightFlankerEl: HTMLElement | null = null;
 
     for (const card of visibleCards) {
-      const span = card.size ?? 1;
+      const span = Math.min(card.size ?? 1, COLS); // clamp span to column count
 
       // Wrap to next row if span doesn't fit
-      if (col + span - 1 > 3) { row++; col = 1; }
+      if (col + span - 1 > COLS) { row++; col = 1; }
 
-      // Radial row (row 2) constraints: only span-1 cards can flank; skip col 2 (radial slot)
+      // Radial row (row 2) constraints: only span-1 cards can flank; skip RADIAL_COL
       if (radialEnabled && row === 2) {
-        if (col === 1 && span > 1) { row++; col = 1; }       // span-2/3 can't flank — push below
-        else if (col === 2) {
-          col = 3;
-          if (span > 1) { row++; col = 1; }                  // no room at col 3 either — push below
+        if (col === 1 && span > 1) { row++; col = 1; }       // wide cards can't flank — push below
+        else if (col === RADIAL_COL) {
+          col = RADIAL_COL + 1;
+          if (col > COLS || span > 1) { row++; col = 1; }    // no room — push to next row
         }
       }
 
@@ -316,10 +337,10 @@ export class DashboardContent {
       this.populatePulseCard(el, card, pctx, ctx);
 
       if (radialEnabled && row === 2 && col === 1) leftFlankerEl = el;
-      if (radialEnabled && row === 2 && col === 3) rightFlankerEl = el;
+      if (radialEnabled && row === 2 && col === COLS) rightFlankerEl = el;
 
       col += span;
-      if (col > 3) { col = 1; row++; }
+      if (col > COLS) { col = 1; row++; }
     }
 
     if (radialEnabled) {
@@ -327,7 +348,7 @@ export class DashboardContent {
       rightFlankerEl?.addClass('qw-dash-pulse-flanker');
 
       const slot = grid.createEl('div', { cls: 'qw-dash-radial-slot' });
-      slot.style.gridColumn = '2';
+      slot.style.gridColumn = String(RADIAL_COL);
       slot.style.gridRow = '2';
       radialLauncherWidget.render(slot, ctx);
     }
