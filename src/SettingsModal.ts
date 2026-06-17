@@ -1,4 +1,4 @@
-import { Modal, Setting } from 'obsidian';
+import { Modal, Setting, setIcon } from 'obsidian';
 
 import { FileSuggest, FolderSuggest, renderChipList } from './PathSuggest.ts';
 
@@ -32,6 +32,7 @@ export class ReadyBoardSettingsModal extends Modal {
   private activeTab: SettingsTab = 'general';
   private tabBtns = new Map<SettingsTab, HTMLElement>();
   private body!: HTMLElement;
+  private activeRadialSlot = 0;
 
   constructor(plugin: Plugin) {
     super(plugin.app);
@@ -39,17 +40,24 @@ export class ReadyBoardSettingsModal extends Modal {
   }
 
   override onOpen(): void {
-    // Normalize widget ids on open so any tab's save flushes clean data,
-    // not just when the Dashboard tab is opened.
+    this.modalEl.addClass('qw-settings-modal');
+    this.titleEl.setText('ReadyBoard Settings');
+    this.renderInto(this.contentEl);
+  }
+
+  override onClose(): void {
+    this.contentEl.empty();
+  }
+
+  /** Renders the full settings UI into any container — used by both the modal
+   *  (via onOpen) and the native Obsidian settings tab (inline, no modal). */
+  public renderInto(container: HTMLElement): void {
+    container.empty();
     const s = this.plugin.settings as PluginSettings;
     const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.plugin.dashboardWidgetRegistry.ids()])];
     s.dashboardWidgets = normalizeDashboardWidgets(s.dashboardWidgets as DashboardWidget[], knownIds);
 
-    this.modalEl.addClass('qw-settings-modal');
-    this.titleEl.setText('ReadyBoard Settings');
-
-    // Tab bar
-    const tabBar = this.contentEl.createDiv('qw-settings-tab-bar');
+    const tabBar = container.createDiv('qw-settings-tab-bar');
     for (const { id, label } of TABS) {
       const btn = tabBar.createEl('button', { cls: 'qw-settings-tab-btn', text: label });
       if (id === this.activeTab) btn.addClass('is-active');
@@ -57,12 +65,8 @@ export class ReadyBoardSettingsModal extends Modal {
       this.tabBtns.set(id, btn);
     }
 
-    this.body = this.contentEl.createDiv('qw-settings-body');
+    this.body = container.createDiv('qw-settings-body');
     this.renderTab();
-  }
-
-  override onClose(): void {
-    this.contentEl.empty();
   }
 
   private switchTab(tab: SettingsTab): void {
@@ -148,6 +152,11 @@ export class ReadyBoardSettingsModal extends Modal {
     new Setting(el).setName('Show backlink count').addToggle((t) => t.setValue(s.cardShowBacklinks ?? true).onChange((v) => { s.cardShowBacklinks = v; save(); }));
     new Setting(el).setName('Show preview').setDesc('Short text excerpt from the note body.')
       .addToggle((t) => t.setValue(s.cardShowPreview ?? true).onChange((v) => { s.cardShowPreview = v; save(); }));
+    new Setting(el).setName('Show breadcrumbs').setDesc('Show parent note above each item in the list.')
+      .addToggle((t) => t.setValue(s.showBreadcrumbs ?? false).onChange((v) => { s.showBreadcrumbs = v; save(); }));
+    new Setting(el).setName('Breadcrumb field override').setDesc('Custom frontmatter field for parent. Leave blank to use "up".')
+      .addText((t) => t.setPlaceholder('up').setValue(s.breadcrumbField ?? '')
+        .onChange((v) => { s.breadcrumbField = v.trim(); save(); }));
     new Setting(el).setName('Extra frontmatter fields').setDesc('One per line (e.g. status, type). Shows only when present.')
       .addTextArea((t) => {
         t.setPlaceholder('status\ntype').setValue((s.cardFrontmatterFields ?? []).join('\n'))
@@ -266,7 +275,9 @@ export class ReadyBoardSettingsModal extends Modal {
 
   private renderDashboard(s: PluginSettings, save: () => void): void {
     const el = this.body;
+    const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.plugin.dashboardWidgetRegistry.ids()])];
 
+    // ── Shared settings ──
     new Setting(el).setName('Overdrag to new note').setDesc('Pull down past the top of the dashboard to instantly create a new note.')
       .addToggle((t) => t.setValue(s.enableOverdrag !== false).onChange((v) => { s.enableOverdrag = v; save(); }));
 
@@ -275,43 +286,82 @@ export class ReadyBoardSettingsModal extends Modal {
         .setValue(s.dashboardSidebarSide ?? 'right')
         .onChange((v) => { s.dashboardSidebarSide = v as 'left' | 'right'; save(); }));
 
-    new Setting(el).setName('Recently touched count')
-      .addText((t) => t.setPlaceholder('15').setValue(String(s.recentListCount ?? 15))
-        .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.recentListCount = n; save(); } }));
-
-    new Setting(el).setName('Recently modified count')
-      .addText((t) => t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
-        .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.modifiedListCount = n; save(); } }));
-
-    new Setting(el).setName('Show breadcrumbs').setDesc('Show parent note above each item in the list.')
-      .addToggle((t) => t.setValue(s.showBreadcrumbs ?? false).onChange((v) => { s.showBreadcrumbs = v; save(); }));
-
-    new Setting(el).setName('Breadcrumb field override').setDesc('Custom frontmatter field for parent. Leave blank to use "up".')
-      .addText((t) => t.setPlaceholder('up').setValue(s.breadcrumbField ?? '')
-        .onChange((v) => { s.breadcrumbField = v.trim(); save(); }));
-
     new Setting(el).setName('Modified date field').setDesc('Frontmatter field for modified date. Leave blank to use file mtime.')
       .addText((t) => t.setPlaceholder('date-modified').setValue(s.modifiedDateField ?? '')
         .onChange((v) => { s.modifiedDateField = v.trim(); save(); }));
 
+    // ── Per-surface toggle ──
+    new Setting(el)
+      .setName('Separate sidebar settings')
+      .setDesc('Configure widgets and list counts independently for the overlay dashboard and the sidebar panel.')
+      .addToggle((t) => t.setValue(s.dashboardSeparateSettings ?? false).onChange((v) => {
+        s.dashboardSeparateSettings = v;
+        // Seed sidebar widgets from modal widgets on first enable so it isn't blank.
+        if (v && (!s.sidebarWidgets || s.sidebarWidgets.length === 0)) {
+          s.sidebarWidgets = normalizeDashboardWidgets(s.dashboardWidgets as DashboardWidget[], knownIds).map((w) => ({ ...w }));
+        }
+        save(); this.redraw();
+      }));
+
+    if (s.dashboardSeparateSettings) {
+      // ── Overlay (modal) dashboard ──
+      el.createEl('h3', { text: 'Overlay Dashboard' });
+      new Setting(el).setName('Recently touched count')
+        .addText((t) => t.setPlaceholder('15').setValue(String(s.recentListCount ?? 15))
+          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.recentListCount = n; save(); } }));
+      new Setting(el).setName('Recently modified count')
+        .addText((t) => t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
+          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.modifiedListCount = n; save(); } }));
+      this.renderWidgetList(el, s, 'modal', knownIds, save);
+
+      // ── Sidebar dashboard ──
+      el.createEl('h3', { text: 'Sidebar Dashboard' });
+      new Setting(el).setName('Recently touched count')
+        .addText((t) => t.setPlaceholder('15').setValue(String(s.sidebarRecentListCount ?? 15))
+          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.sidebarRecentListCount = n; save(); } }));
+      new Setting(el).setName('Recently modified count')
+        .addText((t) => t.setPlaceholder('15').setValue(String(s.sidebarModifiedListCount ?? 15))
+          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.sidebarModifiedListCount = n; save(); } }));
+      this.renderWidgetList(el, s, 'sidebar', knownIds, save);
+    } else {
+      // ── Shared counts + widgets ──
+      new Setting(el).setName('Recently touched count')
+        .addText((t) => t.setPlaceholder('15').setValue(String(s.recentListCount ?? 15))
+          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.recentListCount = n; save(); } }));
+      new Setting(el).setName('Recently modified count')
+        .addText((t) => t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
+          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.modifiedListCount = n; save(); } }));
+      this.renderWidgetList(el, s, 'modal', knownIds, save);
+    }
+  }
+
+  private renderWidgetList(
+    el: HTMLElement,
+    s: PluginSettings,
+    surface: 'modal' | 'sidebar',
+    knownIds: string[],
+    save: () => void,
+  ): void {
+    const isSidebar = surface === 'sidebar';
     el.createEl('h3', { text: 'Widgets' });
-    const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.plugin.dashboardWidgetRegistry.ids()])];
 
     const presetSetting = new Setting(el).setName('Presets');
     for (const preset of Object.values(DASHBOARD_PRESETS) as Array<{ label: string; widgets: DashboardWidget[] }>) {
       presetSetting.addButton((btn) => btn.setButtonText(preset.label).onClick(() => {
-        s.dashboardWidgets = normalizeDashboardWidgets(
+        const normalized = normalizeDashboardWidgets(
           preset.widgets.map((w) => ({ type: w.type, enabled: w.enabled })),
           knownIds,
         );
+        if (isSidebar) s.sidebarWidgets = normalized;
+        else s.dashboardWidgets = normalized;
         save(); this.redraw();
       }));
     }
 
-    const widgets = normalizeDashboardWidgets(s.dashboardWidgets as DashboardWidget[], knownIds);
-    // Point s.dashboardWidgets at the same array so that toggle/reorder
-    // mutations in the handlers below are captured by save().
-    s.dashboardWidgets = widgets;
+    const raw = isSidebar ? (s.sidebarWidgets as DashboardWidget[]) : (s.dashboardWidgets as DashboardWidget[]);
+    const widgets = normalizeDashboardWidgets(raw, knownIds);
+    if (isSidebar) s.sidebarWidgets = widgets;
+    else s.dashboardWidgets = widgets;
 
     for (let i = 0; i < widgets.length; i++) {
       const widget = widgets[i];
@@ -358,20 +408,91 @@ export class ReadyBoardSettingsModal extends Modal {
         .setValue(s.dashboardRadialInteraction ?? 'press-hold')
         .onChange((v) => { s.dashboardRadialInteraction = v as DashboardRadialInteraction; save(); }));
 
-    el.createEl('h3', { text: 'Radial Commands' });
-    el.createEl('p', { cls: 'setting-item-description', text: 'Six slots in clockwise order: 12, 2, 4, 6, 8, 10 o\'clock.' });
+    el.createEl('h3', { text: 'Command Slots' });
 
     const commands = s.radialCommands as QuickAction[];
-    const clock = ['12 o\'clock (top)', '2 o\'clock', '4 o\'clock', '6 o\'clock (bottom)', '8 o\'clock', '10 o\'clock'];
-    for (let i = 0; i < commands.length; i++) {
-      el.createEl('h4', { text: `Slot ${clock[i] ?? i + 1}` });
-      this.renderQuickActionFields(el, commands, i, save, { removable: false });
-    }
+    const CLOCK = ['12 o\'clock', '2 o\'clock', '4 o\'clock', '6 o\'clock', '8 o\'clock', '10 o\'clock'];
 
-    new Setting(el).addButton((btn) => btn.setButtonText('Reset to defaults').onClick(() => {
+    // Interactive preview — click a slot to edit it
+    this.renderRadialPreview(el, commands);
+
+    // Editor for the selected slot
+    const slotLabel = el.createEl('h4', { cls: 'qw-settings-radial-slot-label' });
+    slotLabel.setText(`Slot — ${CLOCK[this.activeRadialSlot] ?? ''}`)
+    this.renderQuickActionFields(el, commands, this.activeRadialSlot, save, { removable: false });
+
+    new Setting(el).addButton((btn) => btn.setButtonText('Reset slots to defaults').onClick(() => {
       s.radialCommands = RADIAL_COMMAND_DEFAULTS.map((c) => ({ ...c }));
+      this.activeRadialSlot = 0;
       save(); this.redraw();
     }));
+  }
+
+  private renderRadialPreview(el: HTMLElement, commands: QuickAction[]): void {
+    const STAGE_SIZE = 240;
+    const STAGE_CENTER = STAGE_SIZE / 2;
+    const GUIDE_RADIUS = 82;
+    const SLOTS = [
+      { left: STAGE_CENTER,      top: STAGE_CENTER - GUIDE_RADIUS },
+      { left: STAGE_CENTER + 71, top: STAGE_CENTER - 41 },
+      { left: STAGE_CENTER + 71, top: STAGE_CENTER + 41 },
+      { left: STAGE_CENTER,      top: STAGE_CENTER + GUIDE_RADIUS },
+      { left: STAGE_CENTER - 71, top: STAGE_CENTER + 41 },
+      { left: STAGE_CENTER - 71, top: STAGE_CENTER - 41 },
+    ];
+
+    const wrap = el.createDiv('qw-settings-radial-preview');
+    const stage = wrap.createEl('div', { cls: 'qw-dash-radial-stage' });
+
+    const spokeLines = SLOTS.map((pos) =>
+      `<line x1="${STAGE_CENTER}" y1="${STAGE_CENTER}" x2="${pos.left}" y2="${pos.top}" stroke="#5a536a" stroke-width="1.25" stroke-dasharray="4 7" opacity="0.34"/>`
+    ).join('');
+    const anchors = SLOTS.map((pos) =>
+      `<circle cx="${pos.left}" cy="${pos.top}" r="4" fill="#5a536a" opacity="0.42"/>`
+    ).join('');
+    stage.innerHTML = `<svg class="qw-dash-radial-guide" viewBox="0 0 ${STAGE_SIZE} ${STAGE_SIZE}" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="${STAGE_CENTER}" cy="${STAGE_CENTER}" r="${GUIDE_RADIUS}" fill="none" stroke="#5a536a" stroke-width="1" stroke-dasharray="2 8" opacity="0.2"/>
+      ${spokeLines}${anchors}
+    </svg>`;
+
+    // Center puck (non-interactive)
+    const center = stage.createEl('div', { cls: 'qw-dash-radial-expanded-center' });
+    center.style.setProperty('left', `${STAGE_CENTER}px`, 'important');
+    center.style.setProperty('top', `${STAGE_CENTER}px`, 'important');
+    const outer = center.createEl('span', { cls: 'qw-dash-radial-center-outer' });
+    const mid = outer.createEl('span', { cls: 'qw-dash-radial-center-mid' });
+    const inner = mid.createEl('span', { cls: 'qw-dash-radial-center-inner' });
+    inner.createEl('span', { cls: 'qw-dash-radial-center-label', text: 'CMD' });
+
+    // Slot buttons
+    for (let i = 0; i < SLOTS.length; i++) {
+      const pos = SLOTS[i]!;
+      const cmd = commands[i];
+      const isActive = i === this.activeRadialSlot;
+
+      const btn = stage.createEl('button', {
+        cls: `qw-dash-radial-mini-btn qw-radial-slot-cmd${isActive ? ' qw-settings-slot-active' : ''}`,
+        attr: { type: 'button', 'aria-label': cmd?.label ?? `Slot ${i + 1}` },
+      });
+      btn.style.setProperty('left', `${pos.left}px`, 'important');
+      btn.style.setProperty('top', `${pos.top}px`, 'important');
+
+      if (cmd) {
+        const face = btn.createEl('span', { cls: 'qw-dash-radial-mini-face' });
+        if (cmd.iconType === 'glyph') {
+          face.createEl('span', { cls: 'qw-dash-radial-mini-arrow', text: cmd.icon });
+        } else {
+          const iconEl = face.createEl('span', { cls: 'qw-dash-radial-mini-icon' });
+          setIcon(iconEl, cmd.icon || 'zap');
+        }
+        face.createEl('span', { cls: 'qw-dash-radial-mini-title', text: (cmd.label ?? '').slice(0, 7) });
+      }
+
+      btn.addEventListener('click', () => {
+        this.activeRadialSlot = i;
+        this.redraw();
+      });
+    }
   }
 
   // ── Quick Actions ─────────────────────────────────────────────────────────

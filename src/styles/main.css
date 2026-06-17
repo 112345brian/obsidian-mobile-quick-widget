@@ -295,7 +295,7 @@
 
 /* When radial is expanded: take full row width, hide flanking pulse cards */
 .qw-dash-pulse-grid--radial-expanded .qw-dash-radial-slot {
-  grid-column: 1 / span 3;
+  grid-column: 1 / -1;
 }
 
 .qw-dash-pulse-grid--radial-expanded .qw-dash-pulse-flanker {
@@ -742,7 +742,7 @@
 
 .qw-dash-radial-card {
   margin: 0 16px 20px;
-  min-height: 112px;
+  min-height: 84px;
   background: var(--qw-surface);
   border: 1px solid var(--qw-border);
   border-radius: 16px;
@@ -755,6 +755,7 @@
 
 .qw-dash-radial-card--expanded {
   min-height: 252px;
+  overflow: visible;
 }
 
 .qw-dash-host .qw-dash-radial-compact-center,
@@ -1428,6 +1429,30 @@
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Radial preview in settings */
+
+.qw-settings-radial-preview {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 8px;
+}
+
+.qw-settings-radial-preview .qw-dash-radial-stage {
+  background: var(--background-secondary);
+  border-radius: 50%;
+}
+
+.qw-settings-slot-active.qw-dash-radial-mini-btn {
+  outline: 2px solid var(--qw-purple) !important;
+  outline-offset: 3px !important;
+}
+
+.qw-settings-radial-slot-label {
+  margin: 16px 0 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
 }
 
 /* Chip list (excluded paths etc.) */

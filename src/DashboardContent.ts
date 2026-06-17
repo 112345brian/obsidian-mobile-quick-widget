@@ -101,18 +101,22 @@ export class DashboardContent {
   // alive across opens (the sidebar), where render() itself doesn't re-run.
   private host: HTMLElement | null = null;
 
+  private readonly isSidebar: boolean;
+
   public constructor(
     app: App,
     settings: ReadonlyDeep<PluginSettings>,
     editSettings: (mutate: (settings: PluginSettings) => void | Promise<void>) => Promise<void>,
     closeFn: () => void,
     widgetRegistry: DashboardWidgetRegistry,
+    isSidebar = false,
   ) {
     this.app = app;
     this.settings = settings;
     this.editSettings = editSettings;
     this.closeFn = closeFn;
     this.widgetRegistry = widgetRegistry;
+    this.isSidebar = isSidebar;
   }
 
   private close(): void {
@@ -132,9 +136,16 @@ export class DashboardContent {
 
   /** Context handed to every widget's render function — built-in or third-party. */
   private widgetContext(): DashboardWidgetContext {
+    const useSidebar = this.isSidebar && this.settings.dashboardSeparateSettings;
+    const settings: ReadonlyDeep<PluginSettings> = useSidebar
+      ? { ...this.settings,
+          recentListCount: this.settings.sidebarRecentListCount ?? this.settings.recentListCount,
+          modifiedListCount: this.settings.sidebarModifiedListCount ?? this.settings.modifiedListCount,
+        } as ReadonlyDeep<PluginSettings>
+      : this.settings;
     return {
       app: this.app,
-      settings: this.settings,
+      settings,
       getPlugin: (id) => getExternalPlugin(this.app, id),
       close: () => this.close(),
       openFile: (file) => {
@@ -161,7 +172,11 @@ export class DashboardContent {
     const overdragEnabled = Platform.isMobile && this.settings.enableOverdrag !== false;
 
     const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.widgetRegistry.ids()])];
-    const widgets = normalizeDashboardWidgets((this.settings.dashboardWidgets ?? []) as readonly DashboardWidget[], knownIds);
+    const useSidebar = this.isSidebar && this.settings.dashboardSeparateSettings;
+    const rawWidgets = useSidebar && (this.settings.sidebarWidgets?.length ?? 0) > 0
+      ? (this.settings.sidebarWidgets as readonly DashboardWidget[])
+      : (this.settings.dashboardWidgets ?? []) as readonly DashboardWidget[];
+    const widgets = normalizeDashboardWidgets(rawWidgets, knownIds);
 
     const ctx = this.widgetContext();
     // getBoundingClientRect is more reliable than offsetWidth for containers
@@ -315,8 +330,13 @@ export class DashboardContent {
     grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     const pctx = { allFiles, today, trashApi, trashCount, streak, inboxCount };
 
-    // Radial anchored at (col=2, row=2) — sits in the last column of row 2 when 2-col.
+    // In 3-col mode the radial sits at center column (col 2), row 2.
+    // In 2-col mode there's no center column, so the radial spans the full row and
+    // shifts to row 3 — letting the two cards that would have flanked it (its row-2
+    // neighbours in 3-col mode) appear above it in row 2 instead.
     const RADIAL_COL = Math.min(2, cols);
+    const radialFullRow = cols === 2;
+    const radialGridRow = radialFullRow ? 3 : 2;
 
     let row = 1;
     let col = 1;
@@ -329,12 +349,18 @@ export class DashboardContent {
       // Wrap to next row if span doesn't fit
       if (col + span - 1 > cols) { row++; col = 1; }
 
-      // Radial row (row 2) constraints: only span-1 cards can flank; skip RADIAL_COL
-      if (radialEnabled && row === 2) {
-        if (col === 1 && span > 1) { row++; col = 1; }       // wide cards can't flank — push below
-        else if (col === RADIAL_COL) {
-          col = RADIAL_COL + 1;
-          if (col > cols || span > 1) { row++; col = 1; }    // no room — push to next row
+      // Radial row constraints
+      if (radialEnabled && row === radialGridRow) {
+        if (radialFullRow) {
+          // Entire row is the radial — push pulse cards past it
+          row++; col = 1;
+        } else {
+          // 3-col: only span-1 cards can flank; skip RADIAL_COL (center)
+          if (col === 1 && span > 1) { row++; col = 1; }
+          else if (col === RADIAL_COL) {
+            col = RADIAL_COL + 1;
+            if (col > cols || span > 1) { row++; col = 1; }
+          }
         }
       }
 
@@ -343,9 +369,9 @@ export class DashboardContent {
       el.style.gridRow = String(row);
       this.populatePulseCard(el, card, pctx, ctx);
 
-      if (radialEnabled && row === 2 && col === 1) leftFlankerEl = el;
-      // Right flanker only exists when the radial isn't in the last column (i.e. 3-col mode).
-      if (radialEnabled && row === 2 && col === cols && RADIAL_COL < cols) rightFlankerEl = el;
+      // Flankers only exist in 3-col mode
+      if (radialEnabled && !radialFullRow && row === radialGridRow && col === 1) leftFlankerEl = el;
+      if (radialEnabled && !radialFullRow && row === radialGridRow && col === cols && RADIAL_COL < cols) rightFlankerEl = el;
 
       col += span;
       if (col > cols) { col = 1; row++; }
@@ -356,8 +382,8 @@ export class DashboardContent {
       rightFlankerEl?.addClass('qw-dash-pulse-flanker');
 
       const slot = grid.createEl('div', { cls: 'qw-dash-radial-slot' });
-      slot.style.gridColumn = String(RADIAL_COL);
-      slot.style.gridRow = '2';
+      slot.style.gridColumn = radialFullRow ? '1 / -1' : String(RADIAL_COL);
+      slot.style.gridRow = String(radialGridRow);
       radialLauncherWidget.render(slot, ctx);
     }
   }
@@ -427,21 +453,29 @@ export class DashboardContent {
           updateCachedStatus(): Promise<{ changed: unknown[]; staged: unknown[]; conflicted: string[] }>;
         }>(this.app, 'obsidian-git');
         if (!git?.gitReady) break;
-        const status = git.cachedStatus;
-        if (!status) void git.updateCachedStatus();
-        const changedCount = (status?.changed.length ?? 0) + (status?.staged.length ?? 0);
-        const conflictCount = status?.conflicted.length ?? 0;
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Git' });
-        if (conflictCount > 0) {
-          el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--conflict', text: String(conflictCount) });
-          el.createEl('div', { cls: 'qw-dash-pulse-sub', text: `conflict${conflictCount === 1 ? '' : 's'}` });
-        } else if (changedCount > 0) {
-          el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--gold', text: String(changedCount) });
-          el.createEl('div', { cls: 'qw-dash-pulse-sub', text: `change${changedCount === 1 ? '' : 's'}` });
-        } else {
-          el.createEl('div', { cls: 'qw-dash-pulse-value', text: '✓' });
-          el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'up to date' });
-        }
+        const gitValueEl = el.createEl('div', { cls: 'qw-dash-pulse-value' });
+        const gitSubEl = el.createEl('div', { cls: 'qw-dash-pulse-sub' });
+        const applyGitStatus = (s: { changed: unknown[]; staged: unknown[]; conflicted: string[] } | undefined): void => {
+          const changed = (s?.changed.length ?? 0) + (s?.staged.length ?? 0);
+          const conflicts = s?.conflicted.length ?? 0;
+          gitValueEl.className = 'qw-dash-pulse-value';
+          if (conflicts > 0) {
+            gitValueEl.addClass('qw-dash-pulse-value--conflict');
+            gitValueEl.setText(String(conflicts));
+            gitSubEl.setText(`conflict${conflicts === 1 ? '' : 's'}`);
+          } else if (changed > 0) {
+            gitValueEl.addClass('qw-dash-pulse-value--gold');
+            gitValueEl.setText(String(changed));
+            gitSubEl.setText(`change${changed === 1 ? '' : 's'}`);
+          } else {
+            gitValueEl.setText('✓');
+            gitSubEl.setText('up to date');
+          }
+        };
+        // Show cached value immediately, then always refresh from git
+        applyGitStatus(git.cachedStatus);
+        void git.updateCachedStatus().then((fresh) => { if (el.isConnected) applyGitStatus(fresh); });
         el.addEventListener('click', (e) => {
           if (this.settings.gitPulseCardAction === 'menu') {
             const menu = new Menu();

@@ -182,6 +182,10 @@ export class PluginSettings {
   public dashboardSidebarSide: 'left' | 'right' = 'right';
   public gitPulseCardAction: 'sync' | 'menu' = 'sync';
   public enableOverdrag = true;
+  public dashboardSeparateSettings = false;
+  public sidebarWidgets: DashboardWidget[] = [];
+  public sidebarRecentListCount = 15;
+  public sidebarModifiedListCount = 15;
   public cardShowTags = false;
   public cardShowPreview = true;
   public cardShowBacklinks = true;

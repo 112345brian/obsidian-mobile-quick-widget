@@ -27,7 +27,7 @@ export class DashboardView extends ItemView {
     widgetRegistry: DashboardWidgetRegistry,
   ) {
     super(leaf);
-    this.content = new DashboardContent(this.app, settings, editSettings, () => this.collapse(), widgetRegistry);
+    this.content = new DashboardContent(this.app, settings, editSettings, () => this.collapse(), widgetRegistry, true);
   }
 
   public override getViewType(): string {
