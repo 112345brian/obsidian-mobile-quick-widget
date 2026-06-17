@@ -58,6 +58,10 @@ export function getParentNames(app: App, settings: ReadonlyDeep<PluginSettings>,
 export function noteTags(file: TFile, app: App): string[] {
   const cache = app.metadataCache.getFileCache(file);
   const inline = (cache?.tags ?? []).map((t) => t.tag);
-  const fm = ((cache?.frontmatter?.['tags'] ?? []) as string[]).map((t) => `#${t}`);
+  const rawTags: unknown = cache?.frontmatter?.['tags'];
+  const tagArr: string[] = Array.isArray(rawTags)
+    ? (rawTags as unknown[]).filter((t): t is string => typeof t === 'string')
+    : typeof rawTags === 'string' ? [rawTags] : [];
+  const fm = tagArr.map((t) => `#${t}`);
   return [...new Set([...inline, ...fm])].slice(0, 2);
 }

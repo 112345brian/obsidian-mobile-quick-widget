@@ -32,7 +32,7 @@ export async function executeQuickAction(
       close();
       const target = settings.homePath;
       if (target) {
-        const file = app.vault.getFileByPath(target);
+        const file = app.vault.getFileByPath(target) ?? app.metadataCache.getFirstLinkpathDest(target, '');
         if (file) { await app.workspace.getMostRecentLeaf()?.openFile(file); return; }
       }
       try {

@@ -165,7 +165,7 @@ export class DashboardContent {
     const widgets = normalizeDashboardWidgets((this.settings.dashboardWidgets ?? []) as readonly DashboardWidget[], knownIds);
 
     const ctx = this.widgetContext();
-    this.renderTodaySection(inner, ctx);
+    this.renderTodaySection(inner, ctx, widgets);
 
     for (const widget of widgets) {
       if (!widget.enabled) continue;
@@ -250,12 +250,12 @@ export class DashboardContent {
 
   // ── Today section (date header + pulse grid) — fixed chrome, not a widget ──
 
-  private renderTodaySection(root: HTMLElement, ctx: DashboardWidgetContext): void {
+  private renderTodaySection(root: HTMLElement, ctx: DashboardWidgetContext, normalizedWidgets: DashboardWidget[]): void {
     const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
     dateRow.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
 
     const cards = (this.settings.pulseCards ?? []).filter((c) => c.enabled);
-    const radialEnabled = (this.settings.dashboardWidgets ?? []).some((w) => w.type === 'radial' && w.enabled);
+    const radialEnabled = normalizedWidgets.some((w) => w.type === 'radial' && w.enabled);
 
     if (cards.length === 0 && !radialEnabled) return;
 

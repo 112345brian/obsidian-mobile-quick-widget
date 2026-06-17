@@ -55,7 +55,7 @@ async function render(root: HTMLElement, ctx: DashboardWidgetContext): Promise<v
         text: fromNow(showModified ? getModifiedTime(ctx.app, ctx.settings, file) : file.stat.mtime),
       });
 
-      const showTags = ctx.settings.cardShowTags ?? true;
+      const showTags = ctx.settings.cardShowTags ?? false;
       const tags = showTags ? noteTags(file, ctx.app) : [];
       if (tags.length > 0) {
         const detail = meta.createEl('div', { cls: 'qw-dash-note-detail' });

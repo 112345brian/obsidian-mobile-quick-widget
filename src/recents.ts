@@ -15,7 +15,9 @@ function getContinuePlugin(app: App): ContinuePlugin | null {
 
 export function isExcluded(file: TFile, excluded: readonly string[]): boolean {
   return excluded.some((rule) =>
-    rule.endsWith('/') ? file.path.startsWith(rule) : file.path === rule,
+    rule.endsWith('/')
+      ? file.path.startsWith(rule)
+      : file.path === rule || file.path.startsWith(rule + '/'),
   );
 }
 

@@ -20,9 +20,10 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
         const lines = raw.split('\n');
         for (const line of lines) {
           if (count >= 10) break;
-          const m = line.match(/^(\s*[-*+]|\s*\d+\.) \[ \] (.+)/);
+          const m = line.match(/^(\s*[-*+]|\s*\d+\.) \[ \] (.*)/);
           if (!m) continue;
           const text = m[2]?.trim() ?? '';
+          if (!text) continue;
           const row = card.createEl('div', { cls: 'qw-dash-task-row' });
           row.createEl('div', { cls: 'qw-dash-task-check' });
           row.createEl('div', { cls: 'qw-dash-task-text', text });

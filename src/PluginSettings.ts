@@ -59,7 +59,7 @@ export const DASHBOARD_PRESETS: Record<DashboardPreset, { label: string; widgets
     widgets: [
       { type: 'continue', enabled: true },
       { type: 'tasks', enabled: false },
-      { type: 'new-note', enabled: true },
+      { type: 'more-actions', enabled: true },
     ],
   },
   full: {
@@ -69,7 +69,7 @@ export const DASHBOARD_PRESETS: Record<DashboardPreset, { label: string; widgets
       { type: 'graph', enabled: false },
       { type: 'continue', enabled: true },
       { type: 'tasks', enabled: false },
-      { type: 'new-note', enabled: false },
+      { type: 'more-actions', enabled: false },
     ],
   },
   triage: {
@@ -77,7 +77,7 @@ export const DASHBOARD_PRESETS: Record<DashboardPreset, { label: string; widgets
     widgets: [
       { type: 'continue', enabled: true },
       { type: 'tasks', enabled: false },
-      { type: 'new-note', enabled: true },
+      { type: 'more-actions', enabled: true },
     ],
   },
 };
