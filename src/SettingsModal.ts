@@ -121,8 +121,11 @@ export class ReadyBoardSettingsModal extends Modal {
         .onChange((v) => { s.dashboardSidebarSide = v as 'left' | 'right'; save(); }));
 
     new Setting(el).setName('Modified date field').setDesc('Frontmatter field for modified date. Leave blank to use file mtime.')
-      .addText((t) => t.setPlaceholder('date-modified').setValue(s.modifiedDateField ?? '')
-        .onChange((v) => { s.modifiedDateField = v.trim(); save(); }));
+      .addText((t) => {
+        t.setPlaceholder('date-modified').setValue(s.modifiedDateField ?? '')
+          .onChange((v) => { s.modifiedDateField = v.trim(); });
+        this.saveTextOnCommit(t.inputEl, save);
+      });
 
     // ── Per-surface toggle ──
     new Setting(el)
@@ -140,32 +143,50 @@ export class ReadyBoardSettingsModal extends Modal {
       // ── Overlay (modal) dashboard ──
       el.createEl('h3', { text: 'Overlay Dashboard' });
       new Setting(el).setName('Recently touched count')
-        .addText((t) => t.setPlaceholder('15').setValue(String(s.recentListCount ?? 15))
-          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.recentListCount = n; save(); } }));
+        .addText((t) => {
+          t.setPlaceholder('15').setValue(String(s.recentListCount ?? 15))
+            .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.recentListCount = n; } });
+          this.saveTextOnCommit(t.inputEl, save);
+        });
       new Setting(el).setName('Recently modified count')
-        .addText((t) => t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
-          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.modifiedListCount = n; save(); } }));
+        .addText((t) => {
+          t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
+            .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.modifiedListCount = n; } });
+          this.saveTextOnCommit(t.inputEl, save);
+        });
       this.renderWidgetList(el, s, 'modal', knownIds, save);
       this.renderNoteCardSettings(el, s, 'modal', save);
 
       // ── Sidebar dashboard ──
       el.createEl('h3', { text: 'Sidebar Dashboard' });
       new Setting(el).setName('Recently touched count')
-        .addText((t) => t.setPlaceholder('15').setValue(String(s.sidebarRecentListCount ?? 15))
-          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.sidebarRecentListCount = n; save(); } }));
+        .addText((t) => {
+          t.setPlaceholder('15').setValue(String(s.sidebarRecentListCount ?? 15))
+            .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.sidebarRecentListCount = n; } });
+          this.saveTextOnCommit(t.inputEl, save);
+        });
       new Setting(el).setName('Recently modified count')
-        .addText((t) => t.setPlaceholder('15').setValue(String(s.sidebarModifiedListCount ?? 15))
-          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.sidebarModifiedListCount = n; save(); } }));
+        .addText((t) => {
+          t.setPlaceholder('15').setValue(String(s.sidebarModifiedListCount ?? 15))
+            .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.sidebarModifiedListCount = n; } });
+          this.saveTextOnCommit(t.inputEl, save);
+        });
       this.renderWidgetList(el, s, 'sidebar', knownIds, save);
       this.renderNoteCardSettings(el, s, 'sidebar', save);
     } else {
       // ── Shared counts + widgets ──
       new Setting(el).setName('Recently touched count')
-        .addText((t) => t.setPlaceholder('15').setValue(String(s.recentListCount ?? 15))
-          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.recentListCount = n; save(); } }));
+        .addText((t) => {
+          t.setPlaceholder('15').setValue(String(s.recentListCount ?? 15))
+            .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.recentListCount = n; } });
+          this.saveTextOnCommit(t.inputEl, save);
+        });
       new Setting(el).setName('Recently modified count')
-        .addText((t) => t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
-          .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.modifiedListCount = n; save(); } }));
+        .addText((t) => {
+          t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
+            .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.modifiedListCount = n; } });
+          this.saveTextOnCommit(t.inputEl, save);
+        });
       this.renderWidgetList(el, s, 'modal', knownIds, save);
       this.renderNoteCardSettings(el, s, 'modal', save);
     }
@@ -204,7 +225,8 @@ export class ReadyBoardSettingsModal extends Modal {
       .setName('Homepage file path')
       .setDesc('e.g. "Home.md" or "Notes/Index.md"')
       .addText((t) => {
-        t.setPlaceholder('Home.md').setValue(s.homePath).onChange((v) => { s.homePath = v.trim(); save(); });
+        t.setPlaceholder('Home.md').setValue(s.homePath).onChange((v) => { s.homePath = v.trim(); });
+        this.saveTextOnCommit(t.inputEl, save);
         new FileSuggest(this.app, t.inputEl);
       });
 
@@ -216,13 +238,15 @@ export class ReadyBoardSettingsModal extends Modal {
 
     new Setting(el).setName('Folder')
       .addText((t) => {
-        t.setPlaceholder('Inbox').setValue(s.newNoteFolder).onChange((v) => { s.newNoteFolder = v.trim(); save(); });
+        t.setPlaceholder('Inbox').setValue(s.newNoteFolder).onChange((v) => { s.newNoteFolder = v.trim(); });
+        this.saveTextOnCommit(t.inputEl, save);
         new FolderSuggest(this.app, t.inputEl);
       });
 
     new Setting(el).setName('Template')
       .addText((t) => {
-        t.setPlaceholder('Templates/New Note.md').setValue(s.newNoteTemplate).onChange((v) => { s.newNoteTemplate = v.trim(); save(); });
+        t.setPlaceholder('Templates/New Note.md').setValue(s.newNoteTemplate).onChange((v) => { s.newNoteTemplate = v.trim(); });
+        this.saveTextOnCommit(t.inputEl, save);
         new FileSuggest(this.app, t.inputEl);
       });
 
@@ -239,8 +263,11 @@ export class ReadyBoardSettingsModal extends Modal {
           save();
         }));
     const cs = new Setting(el).setName('Custom format').setDesc('Tokens: YYYY YY MM DD HH mm ss')
-      .addText((t) => t.setPlaceholder('YYMMDD_HHmmss').setValue(s.newNoteFilenameCustom ?? '')
-        .onChange((v) => { s.newNoteFilenameCustom = v.trim(); save(); }));
+      .addText((t) => {
+        t.setPlaceholder('YYMMDD_HHmmss').setValue(s.newNoteFilenameCustom ?? '')
+          .onChange((v) => { s.newNoteFilenameCustom = v.trim(); });
+        this.saveTextOnCommit(t.inputEl, save);
+      });
     customEl = cs.settingEl;
     customEl.style.display = s.newNoteFilenameFormat === 'custom' ? '' : 'none';
 
@@ -293,22 +320,24 @@ export class ReadyBoardSettingsModal extends Modal {
           save();
         }));
     new Setting(el).setName('Breadcrumb field override').setDesc('Custom frontmatter field for parent. Leave blank to use "up".')
-      .addText((t) => t
-        .setPlaceholder('up')
-        .setValue(isSidebar ? s.sidebarBreadcrumbField : s.breadcrumbField)
-        .onChange((v) => {
-          if (isSidebar) { s.sidebarBreadcrumbField = v.trim(); } else { s.breadcrumbField = v.trim(); }
-          save();
-        }));
+      .addText((t) => {
+        t.setPlaceholder('up')
+          .setValue(isSidebar ? s.sidebarBreadcrumbField : s.breadcrumbField)
+          .onChange((v) => {
+            if (isSidebar) { s.sidebarBreadcrumbField = v.trim(); } else { s.breadcrumbField = v.trim(); }
+          });
+        this.saveTextOnCommit(t.inputEl, save);
+      });
     new Setting(el).setName('Extra frontmatter fields').setDesc('One per line (e.g. status, type). Shows only when present.')
-      .addTextArea((t) => t
-        .setPlaceholder('status\ntype')
-        .setValue((isSidebar ? s.sidebarCardFrontmatterFields : s.cardFrontmatterFields).join('\n'))
-        .onChange((v) => {
-          const fields = v.split('\n').map((f) => f.trim()).filter(Boolean);
-          if (isSidebar) { s.sidebarCardFrontmatterFields = fields; } else { s.cardFrontmatterFields = fields; }
-          save();
-        }));
+      .addTextArea((t) => {
+        t.setPlaceholder('status\ntype')
+          .setValue((isSidebar ? s.sidebarCardFrontmatterFields : s.cardFrontmatterFields).join('\n'))
+          .onChange((v) => {
+            const fields = v.split('\n').map((f) => f.trim()).filter(Boolean);
+            if (isSidebar) { s.sidebarCardFrontmatterFields = fields; } else { s.cardFrontmatterFields = fields; }
+          });
+        this.saveTextOnCommit(t.inputEl, save, true);
+      });
   }
 
   private renderPulse(s: PluginSettings, save: () => void): void {
@@ -343,7 +372,8 @@ export class ReadyBoardSettingsModal extends Modal {
       el.createEl('h3', { text: 'Inbox' });
       new Setting(el).setName('Inbox folder path').setDesc('e.g. "Inbox" or "Capture/Unsorted"')
         .addText((t) => {
-          t.setPlaceholder('Inbox').setValue(s.inboxPath ?? '').onChange((v) => { s.inboxPath = v.trim(); save(); });
+          t.setPlaceholder('Inbox').setValue(s.inboxPath ?? '').onChange((v) => { s.inboxPath = v.trim(); });
+          this.saveTextOnCommit(t.inputEl, save);
           new FolderSuggest(this.app, t.inputEl);
         });
     }
@@ -480,11 +510,17 @@ export class ReadyBoardSettingsModal extends Modal {
     if (!action) { return; }
 
     new Setting(el).setName('Label')
-      .addText((t) => t.setValue(action.label).onChange((v) => { action.label = v; save(); }));
+      .addText((t) => {
+        t.setValue(action.label).onChange((v) => { action.label = v; });
+        this.saveTextOnCommit(t.inputEl, save);
+      });
 
     new Setting(el).setName('Icon')
       .setDesc(action.iconType === 'glyph' ? 'Literal glyph, e.g. ✦' : 'Lucide icon name — lucide.dev')
-      .addText((t) => t.setPlaceholder('zap').setValue(action.icon).onChange((v) => { action.icon = v; save(); }))
+      .addText((t) => {
+        t.setPlaceholder('zap').setValue(action.icon).onChange((v) => { action.icon = v; });
+        this.saveTextOnCommit(t.inputEl, save);
+      })
       .addDropdown((dd) => dd.addOption('lucide', 'Lucide').addOption('glyph', 'Glyph')
         .setValue(action.iconType ?? 'lucide').onChange((v) => { action.iconType = v as QuickActionIconType; save(); this.redraw(); }));
 
@@ -503,11 +539,17 @@ export class ReadyBoardSettingsModal extends Modal {
 
     if (action.action === 'append-to-note') {
       new Setting(el).setName('Target note').setDesc('Path to append to, e.g. "Inbox/Tasks.md"')
-        .addText((t) => t.setPlaceholder('Inbox/Tasks.md').setValue(action.notePath ?? '')
-          .onChange((v) => { action.notePath = v.trim(); save(); }));
+        .addText((t) => {
+          t.setPlaceholder('Inbox/Tasks.md').setValue(action.notePath ?? '')
+            .onChange((v) => { action.notePath = v.trim(); });
+          this.saveTextOnCommit(t.inputEl, save);
+        });
       new Setting(el).setName('Append template').setDesc('{{text}} is replaced with your input.')
-        .addText((t) => t.setPlaceholder('- [ ] {{text}}').setValue(action.appendTemplate ?? '')
-          .onChange((v) => { action.appendTemplate = v.trim(); save(); }));
+        .addText((t) => {
+          t.setPlaceholder('- [ ] {{text}}').setValue(action.appendTemplate ?? '')
+            .onChange((v) => { action.appendTemplate = v.trim(); });
+          this.saveTextOnCommit(t.inputEl, save);
+        });
     }
 
     if (opts.removable) {
@@ -692,6 +734,25 @@ export class ReadyBoardSettingsModal extends Modal {
   }
 
   // ── Quick Actions ─────────────────────────────────────────────────────────
+
+  private saveTextOnCommit(inputEl: HTMLInputElement | HTMLTextAreaElement, save: () => void, multiline = false): void {
+    let savedValue = inputEl.value;
+    const commit = (): void => {
+      if (inputEl.value === savedValue) { return; }
+      savedValue = inputEl.value;
+      save();
+    };
+    const onKeyDown = (event: Event): void => {
+      if (!(event instanceof KeyboardEvent)) { return; }
+      if (event.key !== 'Enter') { return; }
+      if (multiline && !event.metaKey && !event.ctrlKey) { return; }
+      if (!multiline) { event.preventDefault(); }
+      commit();
+    };
+
+    inputEl.addEventListener('blur', commit);
+    inputEl.addEventListener('keydown', onKeyDown);
+  }
 
   private seedSidebarDashboardSettings(s: PluginSettings, knownIds: string[]): void {
     s.sidebarWidgets = normalizeDashboardWidgets(s.dashboardWidgets, knownIds).map((w) => ({ ...w }));

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.8 — 2026-06-17
+
+### Fixed
+- Text fields in ReadyBoard settings now save on blur or Enter instead of on every keystroke, preventing Obsidian Settings search from stealing focus while typing.
+
 ## 0.3.7 — 2026-06-17
 
 ### Changed
