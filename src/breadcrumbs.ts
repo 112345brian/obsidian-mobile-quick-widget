@@ -1,24 +1,26 @@
-import type { App, TFile } from 'obsidian';
+import type {
+ App, TFile
+} from 'obsidian';
 
 import { getExternalPlugin } from './externalPlugin.ts';
 
 // ── Breadcrumbs plugin shim (for parent lookup) ──────────────────────────────
 
-interface BCGraph {
-  has_node(path: string): boolean;
-  get_filtered_outgoing_edges(path: string): { target_id: string; attr: { field?: string; dir?: string; direction?: string } }[];
-}
+export type BCRel = 'child' | 'next' | 'parent' | 'prev' | 'sibling';
 
-export function getBCGraph(app: App): BCGraph | null {
-  const plugin = getExternalPlugin<{ graph?: BCGraph }>(app, 'breadcrumbs');
-  return plugin?.graph ?? null;
+interface BCGraph {
+  get_filtered_outgoing_edges(path: string): { attr: { dir?: string; direction?: string; field?: string }; target_id: string }[];
+  has_node(path: string): boolean;
 }
 
 // ── Bread-trail / Breadcrumbs relation resolver ──────────────────────────────
 // Reads frontmatter links directly — no plugin API dependency.
 // Bread-trail uses keys: up, up.*, down, down.*, next, next.*, prev, prev.*
 
-export type BCRel = 'parent' | 'child' | 'next' | 'prev' | 'sibling';
+export function getBCGraph(app: App): BCGraph | null {
+  const plugin = getExternalPlugin<{ graph?: BCGraph }>(app, 'breadcrumbs');
+  return plugin?.graph ?? null;
+}
 
 /**
  * The relationship colour system, shared by every surface that visualises
@@ -28,19 +30,16 @@ export type BCRel = 'parent' | 'child' | 'next' | 'prev' | 'sibling';
  */
 export const REL_PALETTE = {
   gold: '#c9a84c', goldBright: '#e3c98a',
-  teal: '#4ca8a0', tealBright: '#7fd0c8',
   rose: '#bf5c7c', roseBright: '#e08aa6',
+  teal: '#4ca8a0', tealBright: '#7fd0c8'
 } as const;
 
-export function relColor(rel: BCRel | undefined): { node: string; label: string } {
-  switch (rel) {
-    case 'parent': return { node: REL_PALETTE.gold, label: REL_PALETTE.goldBright };
-    case 'child':  return { node: REL_PALETTE.teal, label: REL_PALETTE.tealBright };
-    case 'sibling':
-    case 'next':
-    case 'prev':   return { node: REL_PALETTE.rose, label: REL_PALETTE.roseBright };
-    default:       return { node: '#3a3a50', label: '#9b7ce8' };
-  }
+export interface CategorizedNeighbors {
+  children: TFile[];
+  next: TFile[];
+  parents: TFile[];
+  prev: TFile[];
+  siblings: TFile[];
 }
 
 export interface NeighborRelation {
@@ -48,23 +47,68 @@ export interface NeighborRelation {
   siblingParent?: string | undefined;
 }
 
+/**
+ * Discovers a note's linked neighbors (resolved links, both directions) and
+ * classifies each by breadcrumb relation. Returns the files grouped by type.
+ * `parentField` matches DashboardModal's `breadcrumbField` setting (defaults
+ * to 'up') so the radial and the dashboard agree on which frontmatter key
+ * marks a parent link.
+ */
+export function getCategorizedNeighbors(app: App, center: TFile, parentField = 'up'): CategorizedNeighbors {
+  const resolved = app.metadataCache.resolvedLinks;
+  const outgoing = Object.keys(resolved[center.path] ?? {});
+  const incoming: string[] = [];
+  for (const [src, links] of Object.entries(resolved)) {
+    if (src !== center.path && links[center.path]) { incoming.push(src); }
+  }
+  const neighborPaths = [...new Set([...outgoing, ...incoming])];
+  const relations = resolveBCRelations(app, center, neighborPaths, parentField);
+
+  const out: CategorizedNeighbors = { children: [], next: [], parents: [], prev: [], siblings: [] };
+  for (const [path, info] of relations) {
+    const file = app.vault.getFileByPath(path);
+    if (!file) { continue; }
+    switch (info.rel) {
+      case 'child': out.children.push(file); break;
+      case 'next': out.next.push(file); break;
+      case 'parent': out.parents.push(file); break;
+      case 'prev': out.prev.push(file); break;
+      case 'sibling': out.siblings.push(file); break;
+    }
+  }
+  return out;
+}
+
 export function getFrontmatterLinkTargets(app: App, file: TFile, keyPrefix: string): Set<string> {
   const links = app.metadataCache.getFileCache(file)?.frontmatterLinks ?? [];
   const result = new Set<string>();
   for (const link of links) {
-    if (link.key === keyPrefix || link.key.startsWith(keyPrefix + '.')) {
+    if (link.key === keyPrefix || link.key.startsWith(`${keyPrefix}.`)) {
       const target = app.metadataCache.getFirstLinkpathDest(link.link, file.path);
-      if (target) result.add(target.path);
+      if (target) { result.add(target.path); }
     }
   }
   return result;
+}
+
+// ── Categorized neighbor discovery (for the radial menu) ─────────────────────
+
+export function relColor(rel: BCRel | undefined): { label: string; node: string } {
+  switch (rel) {
+    case 'child': return { label: REL_PALETTE.tealBright, node: REL_PALETTE.teal };
+    case 'next':
+    case 'prev':
+    case 'sibling': return { label: REL_PALETTE.roseBright, node: REL_PALETTE.rose };
+    case 'parent': return { label: REL_PALETTE.goldBright, node: REL_PALETTE.gold };
+    default: return { label: '#9b7ce8', node: '#3a3a50' };
+  }
 }
 
 export function resolveBCRelations(
   app: App,
   center: TFile,
   neighborPaths: string[],
-  parentField = 'up',
+  parentField = 'up'
 ): Map<string, NeighborRelation> {
   const result = new Map<string, NeighborRelation>();
 
@@ -102,7 +146,7 @@ export function resolveBCRelations(
         continue;
       }
       // If center has a parent-field link to center's parent,
-      // and neighbor also links to that same parent → sibling
+      // And neighbor also links to that same parent → sibling
       if (centerParents.size > 0) {
         for (const parentPath of centerParents) {
           if (neighborParents.has(parentPath)) {
@@ -111,7 +155,7 @@ export function resolveBCRelations(
             break;
           }
         }
-        if (result.has(path)) continue;
+        if (result.has(path)) { continue; }
       }
       // If neighbor's next/prev points to center, or center's next/prev resolves from neighbor
       const neighborNext = getFrontmatterLinkTargets(app, file, 'next');
@@ -122,46 +166,4 @@ export function resolveBCRelations(
   }
 
   return result;
-}
-
-// ── Categorized neighbor discovery (for the radial menu) ─────────────────────
-
-export interface CategorizedNeighbors {
-  parents: TFile[];
-  children: TFile[];
-  siblings: TFile[];
-  next: TFile[];
-  prev: TFile[];
-}
-
-/**
- * Discovers a note's linked neighbors (resolved links, both directions) and
- * classifies each by breadcrumb relation. Returns the files grouped by type.
- * `parentField` matches DashboardModal's `breadcrumbField` setting (defaults
- * to 'up') so the radial and the dashboard agree on which frontmatter key
- * marks a parent link.
- */
-export function getCategorizedNeighbors(app: App, center: TFile, parentField = 'up'): CategorizedNeighbors {
-  const resolved = app.metadataCache.resolvedLinks;
-  const outgoing = Object.keys(resolved[center.path] ?? {});
-  const incoming: string[] = [];
-  for (const [src, links] of Object.entries(resolved)) {
-    if (src !== center.path && links[center.path]) incoming.push(src);
-  }
-  const neighborPaths = [...new Set([...outgoing, ...incoming])];
-  const relations = resolveBCRelations(app, center, neighborPaths, parentField);
-
-  const out: CategorizedNeighbors = { parents: [], children: [], siblings: [], next: [], prev: [] };
-  for (const [path, info] of relations) {
-    const file = app.vault.getFileByPath(path);
-    if (!file) continue;
-    switch (info.rel) {
-      case 'parent':  out.parents.push(file);  break;
-      case 'child':   out.children.push(file); break;
-      case 'sibling': out.siblings.push(file); break;
-      case 'next':    out.next.push(file);     break;
-      case 'prev':    out.prev.push(file);     break;
-    }
-  }
-  return out;
 }

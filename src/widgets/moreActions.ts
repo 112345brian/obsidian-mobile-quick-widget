@@ -1,12 +1,14 @@
 import { setIcon } from 'obsidian';
 
-import type { DashboardWidgetContext, DashboardWidgetDefinition } from '../DashboardWidgetApi.ts';
+import type {
+ DashboardWidgetContext, DashboardWidgetDefinition
+} from '../DashboardWidgetApi.ts';
 
 import { executeQuickAction } from '../quickActions.ts';
 
 function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
   const actions = ctx.settings.quickActions ?? [];
-  if (actions.length === 0) return;
+  if (actions.length === 0) { return; }
 
   root.createEl('div', { cls: 'qw-dash-section-label', text: 'MORE ACTIONS' });
   const row = root.createEl('div', { cls: 'qw-dash-actions' });
@@ -23,5 +25,5 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
 export const moreActionsWidget: DashboardWidgetDefinition = {
   id: 'more-actions',
   label: 'More Actions',
-  render,
+  render
 };

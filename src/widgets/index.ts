@@ -19,5 +19,5 @@ export const BUILTIN_WIDGETS: DashboardWidgetDefinition[] = [
   radialLauncherWidget,
   tasksWidget,
   moreActionsWidget,
-  pomodoroWidget,
+  pomodoroWidget
 ];

@@ -1,10 +1,14 @@
-import type { ViewStateResult, WorkspaceLeaf } from 'obsidian';
+import type {
+ ViewStateResult, WorkspaceLeaf
+} from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
 import { ItemView } from 'obsidian';
 
-import type { DashboardViewState, PluginSettings } from '../PluginSettings.ts';
 import type { DashboardWidgetRegistry } from '../DashboardWidgetApi.ts';
+import type {
+ DashboardViewState, PluginSettings
+} from '../PluginSettings.ts';
 
 import { DashboardContent } from '../DashboardContent.ts';
 import { normalizeDashboardViewState } from '../PluginSettings.ts';
@@ -24,16 +28,20 @@ export class DashboardView extends ItemView {
 
   public constructor(
     leaf: WorkspaceLeaf,
-    settings: ReadonlyDeep<PluginSettings> | (() => ReadonlyDeep<PluginSettings>),
-    editSettings: (mutate: (settings: PluginSettings) => void | Promise<void>) => Promise<void>,
-    widgetRegistry: DashboardWidgetRegistry,
+    settings: (() => ReadonlyDeep<PluginSettings>) | ReadonlyDeep<PluginSettings>,
+    editSettings: (mutate: (settings: PluginSettings) => Promise<void> | void) => Promise<void>,
+    widgetRegistry: DashboardWidgetRegistry
   ) {
     super(leaf);
-    this.content = new DashboardContent(this.app, settings, editSettings, () => this.collapse(), widgetRegistry, true);
+    this.content = new DashboardContent(this.app, settings, editSettings, () => { this.collapse(); }, widgetRegistry, true);
   }
 
-  public override getViewType(): string {
-    return VIEW_TYPE_DASHBOARD;
+  /** Render() only runs once, in onOpen — collapsing/revealing the sidebar
+   *  doesn't re-run it (that's the point: widget state survives). So
+   *  keyboard focus, which render() normally sets up, has to be re-applied
+   *  by whoever reveals this leaf. See Plugin.revealDashboardSidebar. */
+  public focusHost(): void {
+    this.content.focusHost();
   }
 
   public override getDisplayText(): string {
@@ -44,10 +52,12 @@ export class DashboardView extends ItemView {
     return 'layout-dashboard';
   }
 
-  public override async onOpen(): Promise<void> {
-    this.containerEl.addClass('qw-dash-host');
-    this.content.setViewState(this.state);
-    await this.content.render(this.contentEl);
+  public override getState(): Record<string, unknown> {
+    return { ...this.state };
+  }
+
+  public override getViewType(): string {
+    return VIEW_TYPE_DASHBOARD;
   }
 
   public override async onClose(): Promise<void> {
@@ -55,8 +65,14 @@ export class DashboardView extends ItemView {
     this.contentEl.empty();
   }
 
-  public override getState(): Record<string, unknown> {
-    return { ...this.state };
+  public override async onOpen(): Promise<void> {
+    this.containerEl.addClass('qw-dash-host');
+    this.content.setViewState(this.state);
+    await this.content.render(this.contentEl);
+  }
+
+  public async refresh(): Promise<void> {
+    await this.content.refresh();
   }
 
   public override async setState(state: unknown, result: ViewStateResult): Promise<void> {
@@ -66,24 +82,11 @@ export class DashboardView extends ItemView {
     await this.content.refresh();
   }
 
-  public async refresh(): Promise<void> {
-    await this.content.refresh();
-  }
-
-  /** render() only runs once, in onOpen — collapsing/revealing the sidebar
-   *  doesn't re-run it (that's the point: widget state survives). So
-   *  keyboard focus, which render() normally sets up, has to be re-applied
-   *  by whoever reveals this leaf. See Plugin.revealDashboardSidebar. */
-  public focusHost(): void {
-    this.content.focusHost();
-  }
-
   /** Hides the sidebar without detaching the leaf, so the view (and its
    * DashboardContent instance) stays alive for next time. */
   private collapse(): void {
     const root = this.leaf.getRoot();
     const { leftSplit, rightSplit } = this.app.workspace;
-    if (root === leftSplit) leftSplit.collapse();
-    else if (root === rightSplit) rightSplit.collapse();
+    if (root === leftSplit) { leftSplit.collapse(); } else if (root === rightSplit) { rightSplit.collapse(); }
   }
 }

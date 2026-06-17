@@ -1,24 +1,12 @@
-import type { App, TFile } from 'obsidian';
+import type {
+ App, TFile
+} from 'obsidian';
 
 import { getExternalPlugin } from './externalPlugin.ts';
 
 // Continue plugin exposes a navigation log richer than Obsidian's own list.
 interface ContinuePlugin {
   openedLog: string[];
-}
-
-function getContinuePlugin(app: App): ContinuePlugin | null {
-  const plugin = getExternalPlugin<ContinuePlugin>(app, 'obsidian-continue');
-  if (!plugin || !Array.isArray(plugin.openedLog)) return null;
-  return plugin;
-}
-
-export function isExcluded(file: TFile, excluded: readonly string[]): boolean {
-  return excluded.some((rule) =>
-    rule.endsWith('/')
-      ? file.path.startsWith(rule)
-      : file.path === rule || file.path.startsWith(rule + '/'),
-  );
 }
 
 /**
@@ -37,4 +25,18 @@ export function getRecentFiles(app: App, excluded: readonly string[], max: numbe
     .map((p) => app.vault.getFileByPath(p))
     .filter((f): f is TFile => f !== null && f.path !== activePath && !isExcluded(f, excluded))
     .slice(0, max);
+}
+
+export function isExcluded(file: TFile, excluded: readonly string[]): boolean {
+  return excluded.some((rule) =>
+    rule.endsWith('/')
+      ? file.path.startsWith(rule)
+      : file.path === rule || file.path.startsWith(`${rule}/`)
+  );
+}
+
+function getContinuePlugin(app: App): ContinuePlugin | null {
+  const plugin = getExternalPlugin<ContinuePlugin>(app, 'obsidian-continue');
+  if (!plugin || !Array.isArray(plugin.openedLog)) { return null; }
+  return plugin;
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.6 — 2026-06-17
+
+### Added
+- Pulse cards now support separate desktop and mobile visibility modes. Desktop defaults to contextual; mobile defaults to always visible. In contextual mode, passive cards stay hidden unless they have current work to report.
+- Added a References pulse card that appears only when the active note contains citekeys and opens Bripey Citation Suite's reference list.
+
+### Changed
+- Git pulse cards only surface in contextual mode when conflicts are present.
+- Pomodoro pulse cards now remain relevant while active or for an hour after a visible timer session was used.
+
 ## 0.3.5 — 2026-06-17
 
 ### Added

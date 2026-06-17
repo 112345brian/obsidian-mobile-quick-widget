@@ -64,9 +64,12 @@ An opaque bottom-sheet modal with modular widgets:
 - Streak — consecutive days with at least one file modified
 - Git status *(conditional)* — changed file count; tap to commit-and-sync or open git menu. Appears only when Obsidian Git is ready.
 - Inbox *(conditional)* — count of files in a configured folder. Appears only when count > 0.
-- Pomodoro *(conditional, reactive)* — live countdown + mode. Appears only when a session is actively running.
+- Pomodoro *(conditional, reactive)* — live countdown + mode. Appears while a session is active or recently used.
+- References *(conditional)* — citekey count for the active note. Appears only when citekeys are detected and opens Bripey Citation Suite's reference list.
 - Homepage — opens your configured home note
 - Quick action — runs any configured action
+
+Pulse cards have separate desktop and mobile visibility modes. Desktop defaults to `Contextual`; mobile defaults to `Always`. Contextual mode hides passive cards; trash/inbox/references show only with current items, Git shows only with conflicts, and Pomodoro shows only while active or recently used.
 
 Each card has a column-span setting (1, 2, or 3 columns). Span-wide cards that would collide with the radial slot are pushed to the next row.
 
@@ -113,6 +116,8 @@ You can also open the sidebar dashboard with temporary view-state parameters:
 readyBoard?.api?.openDashboardSidebar({
   recentListCount: 6,
   modifiedListCount: 6,
+  pulseCardDesktopDisplayMode: 'contextual',
+  pulseCardMobileDisplayMode: 'always',
   radialMode: 'recents',
   widgets: [
     { type: 'radial', enabled: true },

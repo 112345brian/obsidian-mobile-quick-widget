@@ -3,8 +3,8 @@ import type { ReadonlyDeep } from 'type-fest';
 
 import { Modal } from 'obsidian';
 
-import type { PluginSettings } from '../PluginSettings.ts';
 import type { DashboardWidgetRegistry } from '../DashboardWidgetApi.ts';
+import type { PluginSettings } from '../PluginSettings.ts';
 
 import { DashboardContent } from '../DashboardContent.ts';
 
@@ -15,12 +15,17 @@ export class DashboardModal extends Modal {
 
   public constructor(
     app: App,
-    settings: ReadonlyDeep<PluginSettings> | (() => ReadonlyDeep<PluginSettings>),
-    editSettings: (mutate: (settings: PluginSettings) => void | Promise<void>) => Promise<void>,
-    widgetRegistry: DashboardWidgetRegistry,
+    settings: (() => ReadonlyDeep<PluginSettings>) | ReadonlyDeep<PluginSettings>,
+    editSettings: (mutate: (settings: PluginSettings) => Promise<void> | void) => Promise<void>,
+    widgetRegistry: DashboardWidgetRegistry
   ) {
     super(app);
-    this.content = new DashboardContent(app, settings, editSettings, () => this.close(), widgetRegistry);
+    this.content = new DashboardContent(app, settings, editSettings, () => { this.close(); }, widgetRegistry);
+  }
+
+  public override onClose(): void {
+    this.content.dispose();
+    this.contentEl.empty();
   }
 
   public override async onOpen(): Promise<void> {
@@ -28,10 +33,5 @@ export class DashboardModal extends Modal {
     this.modalEl.addClass('qw-dash-host');
     this.containerEl.addClass('qw-dash-container');
     await this.content.render(this.contentEl);
-  }
-
-  public override onClose(): void {
-    this.content.dispose();
-    this.contentEl.empty();
   }
 }

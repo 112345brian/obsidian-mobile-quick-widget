@@ -1,19 +1,18 @@
-import type { DashboardWidgetContext, DashboardWidgetDefinition } from '../DashboardWidgetApi.ts';
+import type {
+ DashboardWidgetContext, DashboardWidgetDefinition
+} from '../DashboardWidgetApi.ts';
 
 // ── Pomodoro Timer plugin shim ────────────────────────────────────────────
 // Targets eatgrass/obsidian-pomodoro-timer (manifest id "pomodoro-timer").
 // `plugin.timer` is a public Svelte-store-shaped object (Readable<TimerStore>)
 // — `subscribe` follows the standard Svelte store contract (returns an
-// unsubscribe function, and calls back immediately with the current value),
-// which is the stable part of this integration even if the plugin's
-// internals change. `toggleTimer` is a public method used by the plugin's
-// own commands, so it's a reasonably safe surface to call into directly.
+// Unsubscribe function, and calls back immediately with the current value),
+// Which is the stable part of this integration even if the plugin's
+// Internals change. `toggleTimer` is a public method used by the plugin's
+// Own commands, so it's a reasonably safe surface to call into directly.
 
-interface TimerStore {
-  running: boolean;
-  mode: 'WORK' | 'BREAK';
-  remained: { millis: number; human: string };
-  finished: boolean;
+interface PomodoroPlugin {
+  timer?: PomodoroTimer;
 }
 
 interface PomodoroTimer {
@@ -21,19 +20,22 @@ interface PomodoroTimer {
   toggleTimer(): void;
 }
 
-interface PomodoroPlugin {
-  timer?: PomodoroTimer;
+interface TimerStore {
+  finished: boolean;
+  mode: 'BREAK' | 'WORK';
+  remained: { human: string; millis: number };
+  running: boolean;
 }
 
-function getPomodoroTimer(ctx: DashboardWidgetContext): PomodoroTimer | null {
+function getPomodoroTimer(ctx: DashboardWidgetContext): null | PomodoroTimer {
   const timer = ctx.getPlugin<PomodoroPlugin>('pomodoro-timer')?.timer;
-  if (!timer || typeof timer.subscribe !== 'function' || typeof timer.toggleTimer !== 'function') return null;
+  if (!timer || typeof timer.subscribe !== 'function' || typeof timer.toggleTimer !== 'function') { return null; }
   return timer;
 }
 
 function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
   const timer = getPomodoroTimer(ctx);
-  if (!timer) return; // Pomodoro Timer plugin not installed/enabled — show nothing
+  if (!timer) { return; } // Pomodoro Timer plugin not installed/enabled — show nothing
 
   root.createEl('div', { cls: 'qw-dash-section-label', text: 'POMODORO' });
   const card = root.createEl('div', { cls: 'qw-dash-pomodoro-card' });
@@ -43,10 +45,10 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
 
   // The Pomodoro Timer plugin's own store already pushes updates reactively
   // (Svelte `subscribe` contract), and a sidebar's `collapse()` is purely
-  // visual — it doesn't tear down this view or pause its JS — so the
-  // subscription below stays live and accurate the whole time the sidebar
-  // is collapsed. No separate redraw loop needed; that would just be this
-  // plugin re-implementing timing logic the Pomodoro Timer plugin already owns.
+  // Visual — it doesn't tear down this view or pause its JS — so the
+  // Subscription below stays live and accurate the whole time the sidebar
+  // Is collapsed. No separate redraw loop needed; that would just be this
+  // Plugin re-implementing timing logic the Pomodoro Timer plugin already owns.
   const unsubscribe = timer.subscribe((state) => {
     card.classList.toggle('qw-dash-pomodoro-card--running', state.running);
     modeEl.setText(state.mode === 'WORK' ? 'Focus' : 'Break');
@@ -65,5 +67,5 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
 export const pomodoroWidget: DashboardWidgetDefinition = {
   id: 'pomodoro',
   label: 'Pomodoro Timer',
-  render,
+  render
 };

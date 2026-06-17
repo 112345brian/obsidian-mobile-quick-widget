@@ -1,18 +1,24 @@
 import type { TFile } from 'obsidian';
 
 import type { NeighborRelation } from '../breadcrumbs.ts';
-import type { DashboardWidgetContext, DashboardWidgetDefinition } from '../DashboardWidgetApi.ts';
+import type {
+ DashboardWidgetContext, DashboardWidgetDefinition
+} from '../DashboardWidgetApi.ts';
 
-import { relColor, REL_PALETTE, resolveBCRelations } from '../breadcrumbs.ts';
+import {
+ REL_PALETTE, relColor, resolveBCRelations
+} from '../breadcrumbs.ts';
 import { getRecentFiles } from '../recents.ts';
-import { escapeXml, truncate } from '../text.ts';
+import {
+ escapeXml, truncate
+} from '../text.ts';
 
 function buildGraphSvg(
   app: DashboardWidgetContext['app'],
   center: TFile,
   neighborPaths: string[],
   expanded: boolean,
-  relations: Map<string, NeighborRelation>,
+  relations: Map<string, NeighborRelation>
 ): string {
   const cx = 171;
   const viewH = expanded ? 356 : 178;
@@ -20,48 +26,48 @@ function buildGraphSvg(
   const r = expanded ? 115 : 58;
   const n = neighborPaths.length;
 
-  const parentPaths  = neighborPaths.filter((p) => relations.get(p)?.rel === 'parent');
-  const childPaths   = neighborPaths.filter((p) => relations.get(p)?.rel === 'child');
-  const nextPaths    = neighborPaths.filter((p) => relations.get(p)?.rel === 'next');
-  const prevPaths    = neighborPaths.filter((p) => relations.get(p)?.rel === 'prev');
+  const parentPaths = neighborPaths.filter((p) => relations.get(p)?.rel === 'parent');
+  const childPaths = neighborPaths.filter((p) => relations.get(p)?.rel === 'child');
+  const nextPaths = neighborPaths.filter((p) => relations.get(p)?.rel === 'next');
+  const prevPaths = neighborPaths.filter((p) => relations.get(p)?.rel === 'prev');
   const siblingPaths = neighborPaths.filter((p) => relations.get(p)?.rel === 'sibling');
-  const otherPaths   = neighborPaths.filter((p) => !relations.has(p));
+  const otherPaths = neighborPaths.filter((p) => !relations.has(p));
 
-  const spreadArc = (paths: string[], centerAngle: number, spread: number): { path: string; angle: number }[] =>
+  const spreadArc = (paths: string[], centerAngle: number, spread: number): { angle: number; path: string }[] =>
     paths.map((path, i) => ({
-      path,
       angle: centerAngle + (paths.length === 1 ? 0 : (i / (paths.length - 1) - 0.5) * spread),
+      path
     }));
 
-  type Positioned = { path: string; angle: number };
+  interface Positioned { angle: number; path: string }
   let positioned: Positioned[];
 
   const hasBC = parentPaths.length > 0 || childPaths.length > 0 || nextPaths.length > 0 || prevPaths.length > 0 || siblingPaths.length > 0;
   if (hasBC) {
-    // parents → top, children → bottom, prev ← left, next → right, siblings → upper sides, others scattered
-    const parentA  = spreadArc(parentPaths,  -Math.PI / 2,       Math.PI * 0.4);
-    const childA   = spreadArc(childPaths,    Math.PI / 2,        Math.PI * 0.4);
-    const prevA    = spreadArc(prevPaths,     Math.PI,            Math.PI * 0.25);
-    const nextA    = spreadArc(nextPaths,     0,                  Math.PI * 0.25);
-    const siblingA = spreadArc(siblingPaths,  -Math.PI / 4,       Math.PI * 0.5);
-    const otherA   = otherPaths.map((path, i) => ({
-      path,
+    // Parents → top, children → bottom, prev ← left, next → right, siblings → upper sides, others scattered
+    const parentA = spreadArc(parentPaths, -Math.PI / 2, Math.PI * 0.4);
+    const childA = spreadArc(childPaths, Math.PI / 2, Math.PI * 0.4);
+    const prevA = spreadArc(prevPaths, Math.PI, Math.PI * 0.25);
+    const nextA = spreadArc(nextPaths, 0, Math.PI * 0.25);
+    const siblingA = spreadArc(siblingPaths, -Math.PI / 4, Math.PI * 0.5);
+    const otherA = otherPaths.map((path, i) => ({
       angle: (i / Math.max(otherPaths.length, 1)) * 2 * Math.PI,
+      path
     }));
     positioned = [...parentA, ...childA, ...prevA, ...nextA, ...siblingA, ...otherA];
   } else {
     positioned = neighborPaths.map((path, i) => ({
-      path,
       angle: (i / Math.max(n, 1)) * 2 * Math.PI - Math.PI / 2,
+      path
     }));
   }
 
-  const neighbors = positioned.map(({ path, angle }) => {
+  const neighbors = positioned.map(({ angle, path }) => {
     const x = cx + r * Math.cos(angle);
     const y = cy + r * Math.sin(angle);
     const name = app.vault.getFileByPath(path)?.basename ?? path.split('/').pop()?.replace(/\.md$/, '') ?? '';
     const info = relations.get(path) ?? null;
-    return { x, y, name, path, info };
+    return { info, name, path, x, y };
   });
 
   // Edge lines — sequence edges get directional arrows, others plain
@@ -76,8 +82,8 @@ function buildGraphSvg(
       const tip = rel === 'next' ? `${(mx + ux * 6).toFixed(1)},${(my + uy * 6).toFixed(1)}` : `${(mx - ux * 6).toFixed(1)},${(my - uy * 6).toFixed(1)}`;
       const w1 = rel === 'next' ? `${(mx - ux * 4 + px).toFixed(1)},${(my - uy * 4 + py).toFixed(1)}` : `${(mx + ux * 4 + px).toFixed(1)},${(my + uy * 4 + py).toFixed(1)}`;
       const w2 = rel === 'next' ? `${(mx - ux * 4 - px).toFixed(1)},${(my - uy * 4 - py).toFixed(1)}` : `${(mx + ux * 4 - px).toFixed(1)},${(my + uy * 4 - py).toFixed(1)}`;
-      return `<line x1="${cx}" y1="${cy}" x2="${nb.x.toFixed(1)}" y2="${nb.y.toFixed(1)}" stroke="${REL_PALETTE.rose}" stroke-width="1" opacity="0.45"/>` +
-             `<polygon points="${tip} ${w1} ${w2}" fill="${REL_PALETTE.rose}" opacity="0.6"/>`;
+      return `<line x1="${cx}" y1="${cy}" x2="${nb.x.toFixed(1)}" y2="${nb.y.toFixed(1)}" stroke="${REL_PALETTE.rose}" stroke-width="1" opacity="0.45"/>`
+             + `<polygon points="${tip} ${w1} ${w2}" fill="${REL_PALETTE.rose}" opacity="0.6"/>`;
     }
     const stroke = rel ? relColor(rel).node : '#2e2e3a';
     const op = rel ? 0.45 : 0.8;
@@ -105,13 +111,13 @@ function buildGraphSvg(
     }
     if (rem.length > 0) {
       const last = lines[lines.length - 1] ?? '';
-      lines[lines.length - 1] = last.slice(0, MAX_LINE - 1) + '…';
+      lines[lines.length - 1] = `${last.slice(0, MAX_LINE - 1)}…`;
     }
-    if (glyph) lines[lines.length - 1] = (lines[lines.length - 1] ?? '') + glyph;
+    if (glyph) { lines[lines.length - 1] = (lines[lines.length - 1] ?? '') + glyph; }
     return lines;
   };
 
-  type LabelInfo = { x: number; y: number; w: number; totalH: number; lines: string[]; path: string; nx: number; ny: number; info: NeighborRelation | null };
+  interface LabelInfo { info: NeighborRelation | null; lines: string[]; nx: number; ny: number; path: string; totalH: number; w: number; x: number; y: number }
   const labels: LabelInfo[] = neighbors.map((nb) => {
     const rel = nb.info?.rel;
     const glyph = rel === 'parent' ? ' ↑' : rel === 'child' ? ' ↓' : rel === 'next' ? ' →' : rel === 'prev' ? ' ←' : rel === 'sibling' ? ' ·' : '';
@@ -119,9 +125,9 @@ function buildGraphSvg(
     const w = Math.max(...lines.map((l) => l.length)) * CHAR_W;
     const totalH = lines.length * LINE_H;
     const above = nb.y < cy;
-    // y = top of the first line's baseline
+    // Y = top of the first line's baseline
     const ly = above ? nb.y - 4 - LABEL_PAD_Y - totalH + LINE_H : nb.y + 4 + LABEL_PAD_Y + LINE_H;
-    return { x: nb.x, y: ly, w, totalH, lines, path: nb.path, nx: nb.x, ny: nb.y, info: nb.info };
+    return { info: nb.info, lines, nx: nb.x, ny: nb.y, path: nb.path, totalH, w, x: nb.x, y: ly };
   });
 
   // Collision resolution — AABB overlap, resolve on cheapest axis
@@ -131,15 +137,13 @@ function buildGraphSvg(
         const a = labels[i]!, b = labels[j]!;
         const ho = Math.max(0, Math.min(a.x + a.w / 2, b.x + b.w / 2) - Math.max(a.x - a.w / 2, b.x - b.w / 2));
         const vo = Math.max(0, Math.min(a.y + a.totalH, b.y + b.totalH) - Math.max(a.y, b.y));
-        if (ho <= 0 || vo <= 0) continue;
+        if (ho <= 0 || vo <= 0) { continue; }
         if (ho <= vo) {
           const push = ho / 2 + 1;
-          if (a.x <= b.x) { a.x -= push; b.x += push; }
-          else             { a.x += push; b.x -= push; }
+          if (a.x <= b.x) { a.x -= push; b.x += push; } else { a.x += push; b.x -= push; }
         } else {
           const push = vo / 2 + 1;
-          if (a.y <= b.y) { a.y -= push; b.y += push; }
-          else             { a.y += push; b.y -= push; }
+          if (a.y <= b.y) { a.y -= push; b.y += push; } else { a.y += push; b.y -= push; }
         }
       }
     }
@@ -147,7 +151,7 @@ function buildGraphSvg(
 
   const nodes = labels.map((lb) => {
     const rel = lb.info?.rel;
-    const { node: nodeColor, label: labelColor } = relColor(rel);
+    const { label: labelColor, node: nodeColor } = relColor(rel);
     const sibParent = lb.info?.siblingParent;
     const subLabel = rel === 'sibling' && sibParent
       ? `<text x="${lb.nx.toFixed(1)}" y="${(lb.ny - 8).toFixed(1)}" text-anchor="middle" fill="${REL_PALETTE.rose}" font-size="5.5" font-family="monospace" opacity="0.6">${escapeXml(sibParent.slice(0, 10))}</text>`
@@ -187,13 +191,13 @@ function buildGraphSvg(
 
 function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
   const centerFile = ctx.app.workspace.getActiveFile() ?? getRecentFiles(ctx.app, ctx.settings.continueExcluded ?? [], ctx.settings.recentListCount ?? 15)[0];
-  if (!centerFile) return;
+  if (!centerFile) { return; }
 
   const resolvedLinks = ctx.app.metadataCache.resolvedLinks;
   const outgoing = Object.keys(resolvedLinks[centerFile.path] ?? {});
   const incoming: string[] = [];
   for (const [src, links] of Object.entries(resolvedLinks)) {
-    if (src !== centerFile.path && links[centerFile.path]) incoming.push(src);
+    if (src !== centerFile.path && links[centerFile.path]) { incoming.push(src); }
   }
   const neighborPaths = [...new Set([...outgoing, ...incoming])];
   const totalConnections = neighborPaths.length;
@@ -210,7 +214,7 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const file = ctx.app.vault.getFileByPath(el.getAttribute('data-path') ?? '');
-        if (file) ctx.openFile(file);
+        if (file) { ctx.openFile(file); }
       });
     });
 
@@ -242,5 +246,5 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
 export const graphWidget: DashboardWidgetDefinition = {
   id: 'graph',
   label: 'Active Cluster (graph)',
-  render,
+  render
 };

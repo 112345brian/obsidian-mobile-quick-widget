@@ -1,7 +1,11 @@
-import type { App, TFile } from 'obsidian';
+import type {
+ App, TFile
+} from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
-import type { DashboardViewState, PluginSettings } from './PluginSettings.ts';
+import type {
+ DashboardViewState, PluginSettings
+} from './PluginSettings.ts';
 
 /**
  * Everything a third-party widget's render function needs. Built fresh on
@@ -12,10 +16,14 @@ import type { DashboardViewState, PluginSettings } from './PluginSettings.ts';
  */
 export interface DashboardWidgetContext {
   app: App;
-  settings: ReadonlyDeep<PluginSettings>;
-  /** Which dashboard surface is rendering this widget. Useful when a widget
-   *  persists surface-specific state. */
-  surface: 'modal' | 'sidebar';
+  /** Dismisses the dashboard (closes the modal, or collapses the sidebar). */
+  close: () => void;
+  /** Persists a settings change — mutate the live settings object, then it's
+   *  written to disk. Useful for a widget that wants to remember its own
+   *  bit of state (a selected filter, a last-used mode, etc) the same way
+   *  ReadyBoard's own built-in widgets do. You don't need to await it
+   *  unless you want to know when the save completes. */
+  editSettings: (mutate: (settings: PluginSettings) => Promise<void> | void) => Promise<void>;
   /** Looks up another installed plugin's instance by its manifest id —
    *  Obsidian's plugin registry isn't part of the public API, so this wraps
    *  the unsafe cast in one place. Returns undefined if that plugin isn't
@@ -25,19 +33,6 @@ export interface DashboardWidgetContext {
    *  pattern: cast to the surface you expect, then check the specific
    *  fields/methods you're about to use actually exist before calling them. */
   getPlugin: <T>(id: string) => T | undefined;
-  /** Dismisses the dashboard (closes the modal, or collapses the sidebar). */
-  close: () => void;
-  /** Convenience for the common "tap a note" pattern: closes the dashboard,
-   *  then opens `file` in the most recent leaf. */
-  openFile: (file: TFile) => void;
-  /** Short haptic pulse. No-op on platforms without vibration support. */
-  vibrate: (durationMs: number) => void;
-  /** Persists a settings change — mutate the live settings object, then it's
-   *  written to disk. Useful for a widget that wants to remember its own
-   *  bit of state (a selected filter, a last-used mode, etc) the same way
-   *  ReadyBoard's own built-in widgets do. You don't need to await it
-   *  unless you want to know when the save completes. */
-  editSettings: (mutate: (settings: PluginSettings) => void | Promise<void>) => Promise<void>;
   /** Registers a cleanup function (e.g. to unsubscribe from another plugin's
    *  live store) that runs when this dashboard surface closes. Needed for
    *  any widget that sets up a subscription or timer in `render` — without
@@ -46,6 +41,15 @@ export interface DashboardWidgetContext {
    *  plain DOM event listeners, since those are discarded with the DOM
    *  on close/re-render. */
   onCleanup: (fn: () => void) => void;
+  /** Convenience for the common "tap a note" pattern: closes the dashboard,
+   *  then opens `file` in the most recent leaf. */
+  openFile: (file: TFile) => void;
+  settings: ReadonlyDeep<PluginSettings>;
+  /** Which dashboard surface is rendering this widget. Useful when a widget
+   *  persists surface-specific state. */
+  surface: 'modal' | 'sidebar';
+  /** Short haptic pulse. No-op on platforms without vibration support. */
+  vibrate: (durationMs: number) => void;
 }
 
 export interface DashboardWidgetDefinition {
@@ -72,44 +76,7 @@ export interface DashboardWidgetDefinition {
    *  `setInterval`/`requestAnimationFrame` loop if the source has no
    *  push-based way to observe changes. Either way, tear down via
    *  `ctx.onCleanup`. */
-  render: (root: HTMLElement, ctx: DashboardWidgetContext) => void | Promise<void>;
-}
-
-/**
- * Holds every dashboard widget that isn't a ReadyBoard built-in. One
- * instance is owned by the Plugin and shared by every DashboardContent
- * instance (Modal and sidebar alike), so a widget registered while a
- * dashboard is open shows up the next time that dashboard re-renders
- * without needing a reload.
- */
-export class DashboardWidgetRegistry {
-  private readonly widgets = new Map<string, DashboardWidgetDefinition>();
-
-  /**
-   * Registers a widget. Returns an unregister function — call it from your
-   * plugin's `onunload`, or hand it to `this.register(...)` (Component's
-   * own cleanup helper) so the widget disappears cleanly if your plugin is
-   * disabled while a dashboard is open. Registering the same `id` again
-   * replaces the previous definition (useful for hot-reload during dev).
-   */
-  public register(definition: DashboardWidgetDefinition): () => void {
-    this.widgets.set(definition.id, definition);
-    return () => {
-      if (this.widgets.get(definition.id) === definition) this.widgets.delete(definition.id);
-    };
-  }
-
-  public get(id: string): DashboardWidgetDefinition | undefined {
-    return this.widgets.get(id);
-  }
-
-  public list(): DashboardWidgetDefinition[] {
-    return [...this.widgets.values()];
-  }
-
-  public ids(): string[] {
-    return [...this.widgets.keys()];
-  }
+  render: (root: HTMLElement, ctx: DashboardWidgetContext) => Promise<void> | void;
 }
 
 /**
@@ -135,4 +102,41 @@ export class DashboardWidgetRegistry {
 export interface ReadyBoardApi {
   openDashboardSidebar(state?: DashboardViewState): void;
   registerWidget(definition: DashboardWidgetDefinition): () => void;
+}
+
+/**
+ * Holds every dashboard widget that isn't a ReadyBoard built-in. One
+ * instance is owned by the Plugin and shared by every DashboardContent
+ * instance (Modal and sidebar alike), so a widget registered while a
+ * dashboard is open shows up the next time that dashboard re-renders
+ * without needing a reload.
+ */
+export class DashboardWidgetRegistry {
+  private readonly widgets = new Map<string, DashboardWidgetDefinition>();
+
+  public get(id: string): DashboardWidgetDefinition | undefined {
+    return this.widgets.get(id);
+  }
+
+  public ids(): string[] {
+    return [...this.widgets.keys()];
+  }
+
+  public list(): DashboardWidgetDefinition[] {
+    return [...this.widgets.values()];
+  }
+
+  /**
+   * Registers a widget. Returns an unregister function — call it from your
+   * plugin's `onunload`, or hand it to `this.register(...)` (Component's
+   * own cleanup helper) so the widget disappears cleanly if your plugin is
+   * disabled while a dashboard is open. Registering the same `id` again
+   * replaces the previous definition (useful for hot-reload during dev).
+   */
+  public register(definition: DashboardWidgetDefinition): () => void {
+    this.widgets.set(definition.id, definition);
+    return () => {
+      if (this.widgets.get(definition.id) === definition) { this.widgets.delete(definition.id); }
+    };
+  }
 }

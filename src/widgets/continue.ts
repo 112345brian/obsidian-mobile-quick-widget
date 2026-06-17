@@ -1,12 +1,35 @@
-import type { DashboardWidgetContext, DashboardWidgetDefinition } from '../DashboardWidgetApi.ts';
+import type {
+ DashboardWidgetContext, DashboardWidgetDefinition
+} from '../DashboardWidgetApi.ts';
 
-import { getModifiedFiles, getModifiedTime, getParentNames, noteTags } from '../notes.ts';
+import {
+ getModifiedFiles, getModifiedTime, getParentNames, noteTags
+} from '../notes.ts';
 import { getRecentFiles } from '../recents.ts';
-import { extractTailPreview, fromNow } from '../text.ts';
+import {
+ extractTailPreview, fromNow
+} from '../text.ts';
+
+function formatFrontmatterValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map(formatFrontmatterValue).filter(Boolean).join(', ');
+  }
+
+  switch (typeof value) {
+    case 'boolean':
+    case 'number':
+    case 'string':
+      return String(value);
+    case 'object':
+      return value === null ? '' : (JSON.stringify(value) ?? '');
+    default:
+      return '';
+  }
+}
 
 async function render(root: HTMLElement, ctx: DashboardWidgetContext): Promise<void> {
   const touchedFiles = getRecentFiles(ctx.app, ctx.settings.continueExcluded ?? [], ctx.settings.recentListCount ?? 15);
-  if (touchedFiles.length === 0) return;
+  if (touchedFiles.length === 0) { return; }
 
   let showModified = false;
 
@@ -52,14 +75,14 @@ async function render(root: HTMLElement, ctx: DashboardWidgetContext): Promise<v
       }
       titleRight.createEl('span', {
         cls: 'qw-dash-note-time',
-        text: fromNow(showModified ? getModifiedTime(ctx.app, ctx.settings, file) : file.stat.mtime),
+        text: fromNow(showModified ? getModifiedTime(ctx.app, ctx.settings, file) : file.stat.mtime)
       });
 
       const showTags = ctx.settings.cardShowTags ?? false;
       const tags = showTags ? noteTags(file, ctx.app) : [];
       if (tags.length > 0) {
         const detail = meta.createEl('div', { cls: 'qw-dash-note-detail' });
-        for (const tag of tags) detail.createEl('span', { cls: 'qw-dash-note-tag', text: tag });
+        for (const tag of tags) { detail.createEl('span', { cls: 'qw-dash-note-tag', text: tag }); }
       }
 
       const fmFields = ctx.settings.cardFrontmatterFields ?? [];
@@ -67,9 +90,10 @@ async function render(root: HTMLElement, ctx: DashboardWidgetContext): Promise<v
         const fm = ctx.app.metadataCache.getFileCache(file)?.frontmatter;
         if (fm) {
           for (const field of fmFields) {
-            const val = fm[field];
-            if (val !== undefined && val !== null && val !== '') {
-              meta.createEl('div', { cls: 'qw-dash-note-fm', text: `${field}: ${String(val)}` });
+            const val: unknown = fm[field];
+            const formatted = formatFrontmatterValue(val);
+            if (formatted) {
+              meta.createEl('div', { cls: 'qw-dash-note-fm', text: `${field}: ${formatted}` });
             }
           }
         }
@@ -78,11 +102,11 @@ async function render(root: HTMLElement, ctx: DashboardWidgetContext): Promise<v
       if (ctx.settings.cardShowPreview ?? true) {
         try {
           const preview = extractTailPreview(await ctx.app.vault.cachedRead(file));
-          if (preview) meta.createEl('div', { cls: 'qw-dash-note-preview', text: preview });
-        } catch { /* skip */ }
+          if (preview) { meta.createEl('div', { cls: 'qw-dash-note-preview', text: preview }); }
+        } catch { /* Skip */ }
       }
 
-      row.addEventListener('click', () => ctx.openFile(file));
+      row.addEventListener('click', () => { ctx.openFile(file); });
     }
   };
 
@@ -95,5 +119,5 @@ async function render(root: HTMLElement, ctx: DashboardWidgetContext): Promise<v
 export const continueWidget: DashboardWidgetDefinition = {
   id: 'continue',
   label: 'Recently Touched',
-  render,
+  render
 };

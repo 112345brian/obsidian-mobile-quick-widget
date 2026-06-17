@@ -1,4 +1,6 @@
-import type { App, Command } from 'obsidian';
+import type {
+ App, Command
+} from 'obsidian';
 
 import { FuzzySuggestModal } from 'obsidian';
 

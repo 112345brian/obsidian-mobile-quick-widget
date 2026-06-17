@@ -8,9 +8,13 @@ export class AppendPromptModal extends Modal {
   public constructor(
     app: App,
     private readonly hint: string,
-    private readonly onConfirm: (text: string) => void,
+    private readonly onConfirm: (text: string) => void
   ) {
     super(app);
+  }
+
+  public override onClose(): void {
+    this.contentEl.empty();
   }
 
   public override onOpen(): void {
@@ -22,26 +26,22 @@ export class AppendPromptModal extends Modal {
     this.inputEl = contentEl.createEl('input', { type: 'text' });
     this.inputEl.addClass('qw-prompt-input');
     this.inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.confirm();
-      if (e.key === 'Escape') this.close();
+      if (e.key === 'Enter') { this.confirm(); }
+      if (e.key === 'Escape') { this.close(); }
     });
 
     const btns = contentEl.createEl('div', { cls: 'qw-prompt-btns' });
     const cancel = btns.createEl('button', { cls: 'qw-prompt-btn', text: 'Cancel' });
-    cancel.addEventListener('click', () => this.close());
+    cancel.addEventListener('click', () => { this.close(); });
     const confirm = btns.createEl('button', { cls: 'qw-prompt-btn qw-prompt-btn--confirm', text: 'Add' });
-    confirm.addEventListener('click', () => this.confirm());
+    confirm.addEventListener('click', () => { this.confirm(); });
 
-    setTimeout(() => { this.inputEl.focus(); }, 50);
-  }
-
-  public override onClose(): void {
-    this.contentEl.empty();
+    window.setTimeout(() => { this.inputEl.focus(); }, 50);
   }
 
   private confirm(): void {
     const text = this.inputEl.value.trim();
-    if (!text) return;
+    if (!text) { return; }
     this.close();
     this.onConfirm(text);
   }
