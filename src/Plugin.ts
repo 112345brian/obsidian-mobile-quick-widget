@@ -1,7 +1,8 @@
 import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-base';
+import type { ExtractReadonlyPluginSettingsWrapper } from 'obsidian-dev-utils/obsidian/plugin/plugin-types-base';
 
 import type { ReadyBoardApi } from './DashboardWidgetApi.ts';
-import type { PluginSettings } from './PluginSettings.ts';
+import type { DashboardViewState, PluginSettings } from './PluginSettings.ts';
 import type { PluginTypes } from './PluginTypes.ts';
 
 import { DashboardWidgetRegistry } from './DashboardWidgetApi.ts';
@@ -22,6 +23,7 @@ export class Plugin extends PluginBase<PluginTypes> {
   /** Public surface for other plugins. Access via:
    *  `app.plugins.plugins['readyboard']?.api?.registerWidget(...)` */
   public readonly api: ReadyBoardApi = {
+    openDashboardSidebar: (state) => { this.openDashboardSidebar(state); },
     registerWidget: (definition) => this.dashboardWidgetRegistry.register(definition),
   };
 
@@ -30,26 +32,41 @@ export class Plugin extends PluginBase<PluginTypes> {
   }
 
   public openDashboard(): void {
-    new DashboardModal(this.app, this.settings, this.editSettings.bind(this), this.dashboardWidgetRegistry).open();
+    new DashboardModal(this.app, () => this.settings, this.editSettings.bind(this), this.dashboardWidgetRegistry).open();
   }
 
-  public openDashboardSidebar(): void {
-    void this.revealDashboardSidebar();
+  public openDashboardSidebar(state?: DashboardViewState): void {
+    void this.revealDashboardSidebar(state);
   }
 
-  private async revealDashboardSidebar(): Promise<void> {
+  private async revealDashboardSidebar(state?: DashboardViewState): Promise<void> {
     const { workspace } = this.app;
     const existing = workspace.getLeavesOfType(VIEW_TYPE_DASHBOARD)[0];
     if (existing) {
+      if (state !== undefined) {
+        await existing.setViewState({ type: VIEW_TYPE_DASHBOARD, active: true, state: { ...state } });
+      } else {
+        await (existing.view as DashboardView).refresh();
+      }
       await workspace.revealLeaf(existing);
       (existing.view as DashboardView).focusHost();
       return;
     }
-    const side = this.settings.dashboardSidebarSide === 'left' ? workspace.getLeftLeaf(false) : workspace.getRightLeaf(false);
+    const side = this.settings.dashboardSidebarSide === 'left'
+      ? (workspace.getLeftLeaf(false) ?? workspace.getLeftLeaf(true))
+      : (workspace.getRightLeaf(false) ?? workspace.getRightLeaf(true));
     if (!side) return;
-    await side.setViewState({ type: VIEW_TYPE_DASHBOARD, active: true });
+    await side.setViewState({ type: VIEW_TYPE_DASHBOARD, active: true, state: state ? { ...state } : {} });
     await workspace.revealLeaf(side);
     (side.view as DashboardView).focusHost();
+  }
+
+  private async refreshDashboardSidebars(): Promise<void> {
+    await Promise.all(
+      this.app.workspace.getLeavesOfType(VIEW_TYPE_DASHBOARD).map(async (leaf) => {
+        if (leaf.view instanceof DashboardView) await leaf.view.refresh();
+      }),
+    );
   }
 
   /** Generic settings-mutation hook handed to RadialMenuV3Modal, DashboardModal,
@@ -57,7 +74,7 @@ export class Plugin extends PluginBase<PluginTypes> {
    *  context as `ctx.editSettings`. */
   private async editSettings(mutate: (settings: PluginSettings) => void | Promise<void>): Promise<void> {
     try {
-      await this.settingsManager.editAndSave(mutate);
+      await this.settingsManager.editAndSave(mutate, { source: 'dashboard-runtime' });
     } catch (error) {
       console.error('ReadyBoard: failed to save settings', error);
     }
@@ -80,7 +97,7 @@ export class Plugin extends PluginBase<PluginTypes> {
 
     this.registerView(
       VIEW_TYPE_DASHBOARD,
-      (leaf) => new DashboardView(leaf, this.settings, this.editSettings.bind(this), this.dashboardWidgetRegistry),
+      (leaf) => new DashboardView(leaf, () => this.settings, this.editSettings.bind(this), this.dashboardWidgetRegistry),
     );
 
     this.addCommand({
@@ -105,5 +122,21 @@ export class Plugin extends PluginBase<PluginTypes> {
   protected override async onunloadImpl(): Promise<void> {
     await super.onunloadImpl();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_DASHBOARD);
+  }
+
+  protected override async onLoadSettings(
+    _loadedSettings: ExtractReadonlyPluginSettingsWrapper<PluginTypes>,
+    isInitialLoad: boolean,
+  ): Promise<void> {
+    if (!isInitialLoad) await this.refreshDashboardSidebars();
+  }
+
+  protected override async onSaveSettings(
+    _newSettings: ExtractReadonlyPluginSettingsWrapper<PluginTypes>,
+    _oldSettings: ExtractReadonlyPluginSettingsWrapper<PluginTypes>,
+    context: unknown,
+  ): Promise<void> {
+    if (typeof context === 'object' && context !== null && (context as { source?: unknown }).source === 'dashboard-runtime') return;
+    await this.refreshDashboardSidebars();
   }
 }

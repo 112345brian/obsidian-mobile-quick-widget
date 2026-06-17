@@ -3,7 +3,7 @@ import type { ReadonlyDeep } from 'type-fest';
 
 import { Menu, Platform, setIcon } from 'obsidian';
 
-import type { DashboardWidget, PulseCard, PluginSettings, QuickAction } from './PluginSettings.ts';
+import type { DashboardViewState, DashboardWidget, PluginSettings, PulseCard, QuickAction } from './PluginSettings.ts';
 import type { DashboardWidgetContext, DashboardWidgetRegistry } from './DashboardWidgetApi.ts';
 
 import { createNote } from './createNote.ts';
@@ -91,7 +91,7 @@ function getTrashApi(app: App): TrashApi | null {
  */
 export class DashboardContent {
   private readonly app: App;
-  private readonly settings: ReadonlyDeep<PluginSettings>;
+  private readonly settingsProvider: () => ReadonlyDeep<PluginSettings>;
   private readonly editSettings: (mutate: (settings: PluginSettings) => void | Promise<void>) => Promise<void>;
   private readonly closeFn: () => void;
   private readonly widgetRegistry: DashboardWidgetRegistry;
@@ -102,21 +102,26 @@ export class DashboardContent {
   private host: HTMLElement | null = null;
 
   private readonly isSidebar: boolean;
+  private viewState: DashboardViewState = {};
 
   public constructor(
     app: App,
-    settings: ReadonlyDeep<PluginSettings>,
+    settings: ReadonlyDeep<PluginSettings> | (() => ReadonlyDeep<PluginSettings>),
     editSettings: (mutate: (settings: PluginSettings) => void | Promise<void>) => Promise<void>,
     closeFn: () => void,
     widgetRegistry: DashboardWidgetRegistry,
     isSidebar = false,
   ) {
     this.app = app;
-    this.settings = settings;
+    this.settingsProvider = typeof settings === 'function' ? settings : () => settings;
     this.editSettings = editSettings;
     this.closeFn = closeFn;
     this.widgetRegistry = widgetRegistry;
     this.isSidebar = isSidebar;
+  }
+
+  private get settings(): ReadonlyDeep<PluginSettings> {
+    return this.settingsProvider();
   }
 
   private close(): void {
@@ -134,18 +139,62 @@ export class DashboardContent {
     this.cleanupFns = [];
   }
 
-  /** Context handed to every widget's render function — built-in or third-party. */
-  private widgetContext(): DashboardWidgetContext {
-    const useSidebar = this.isSidebar && this.settings.dashboardSeparateSettings;
-    const settings: ReadonlyDeep<PluginSettings> = useSidebar
-      ? { ...this.settings,
-          recentListCount: this.settings.sidebarRecentListCount ?? this.settings.recentListCount,
-          modifiedListCount: this.settings.sidebarModifiedListCount ?? this.settings.modifiedListCount,
+  public setViewState(state: DashboardViewState): void {
+    this.viewState = state;
+  }
+
+  public async refresh(): Promise<void> {
+    if (!this.host) return;
+    await this.render(this.host);
+  }
+
+  private surfaceSettings(): ReadonlyDeep<PluginSettings> {
+    const base = this.settings;
+    const useSidebar = this.isSidebar && base.dashboardSeparateSettings;
+    const settings = useSidebar
+      ? {
+          ...base,
+          dashboardWidgets: base.sidebarWidgets,
+          pulseCards: base.sidebarPulseCards ?? [],
+          recentListCount: base.sidebarRecentListCount,
+          modifiedListCount: base.sidebarModifiedListCount,
+          showBreadcrumbs: base.sidebarShowBreadcrumbs,
+          breadcrumbField: base.sidebarBreadcrumbField,
+          cardShowTags: base.sidebarCardShowTags,
+          cardShowPreview: base.sidebarCardShowPreview,
+          cardShowBacklinks: base.sidebarCardShowBacklinks,
+          cardFrontmatterFields: base.sidebarCardFrontmatterFields,
+          dashboardRadialMode: base.sidebarDashboardRadialMode,
+          dashboardRadialLastMode: base.sidebarDashboardRadialLastMode,
+          dashboardRadialInteraction: base.sidebarDashboardRadialInteraction,
         } as ReadonlyDeep<PluginSettings>
-      : this.settings;
+      : base;
+
+    if (Object.keys(this.viewState).length === 0) return settings;
+
+    return {
+      ...settings,
+      dashboardWidgets: this.viewState.widgets ?? settings.dashboardWidgets,
+      pulseCards: this.viewState.pulseCards ?? settings.pulseCards,
+      recentListCount: this.viewState.recentListCount ?? settings.recentListCount,
+      modifiedListCount: this.viewState.modifiedListCount ?? settings.modifiedListCount,
+      showBreadcrumbs: this.viewState.showBreadcrumbs ?? settings.showBreadcrumbs,
+      breadcrumbField: this.viewState.breadcrumbField ?? settings.breadcrumbField,
+      cardShowTags: this.viewState.cardShowTags ?? settings.cardShowTags,
+      cardShowPreview: this.viewState.cardShowPreview ?? settings.cardShowPreview,
+      cardShowBacklinks: this.viewState.cardShowBacklinks ?? settings.cardShowBacklinks,
+      cardFrontmatterFields: this.viewState.cardFrontmatterFields ?? settings.cardFrontmatterFields,
+      dashboardRadialMode: this.viewState.radialMode ?? settings.dashboardRadialMode,
+      dashboardRadialInteraction: this.viewState.radialInteraction ?? settings.dashboardRadialInteraction,
+    } as ReadonlyDeep<PluginSettings>;
+  }
+
+  /** Context handed to every widget's render function — built-in or third-party. */
+  private widgetContext(settings: ReadonlyDeep<PluginSettings>): DashboardWidgetContext {
     return {
       app: this.app,
       settings,
+      surface: this.isSidebar ? 'sidebar' : 'modal',
       getPlugin: (id) => getExternalPlugin(this.app, id),
       close: () => this.close(),
       openFile: (file) => {
@@ -163,22 +212,20 @@ export class DashboardContent {
     this.dispose(); // in case render() is ever called again on a live instance
     host.empty();
     this.host = host;
+    const settings = this.surfaceSettings();
 
     const scroll = host.createEl('div', { cls: 'qw-dash-scroll' });
     const inner = scroll.createEl('div', { cls: 'qw-dash' });
-    if (this.settings.handedness === 'right') inner.addClass('qw-dash--right');
+    if (settings.handedness === 'right') inner.addClass('qw-dash--right');
 
     // Overdrag-to-new-note: touch-only gesture, skip entirely on desktop.
-    const overdragEnabled = Platform.isMobile && this.settings.enableOverdrag !== false;
+    const overdragEnabled = Platform.isMobile && settings.enableOverdrag !== false;
 
     const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.widgetRegistry.ids()])];
-    const useSidebar = this.isSidebar && this.settings.dashboardSeparateSettings;
-    const rawWidgets = useSidebar && (this.settings.sidebarWidgets?.length ?? 0) > 0
-      ? (this.settings.sidebarWidgets as readonly DashboardWidget[])
-      : (this.settings.dashboardWidgets ?? []) as readonly DashboardWidget[];
+    const rawWidgets = (settings.dashboardWidgets ?? []) as readonly DashboardWidget[];
     const widgets = normalizeDashboardWidgets(rawWidgets, knownIds);
 
-    const ctx = this.widgetContext();
+    const ctx = this.widgetContext(settings);
     // getBoundingClientRect is more reliable than offsetWidth for containers
     // inside CSS-animated modals; fall back to offsetWidth for cases where
     // the sidebar leaf isn't the active tab (both return 0 for display:none,
@@ -239,7 +286,7 @@ export class DashboardContent {
       el.scrollIntoView({ block: 'nearest' });
     };
 
-    host.addEventListener('keydown', (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent): void => {
       const all = rows();
       if (all.length === 0) return;
 
@@ -271,7 +318,9 @@ export class DashboardContent {
           this.close();
           break;
       }
-    });
+    };
+    host.addEventListener('keydown', onKeyDown);
+    this.cleanupFns.push(() => { host.removeEventListener('keydown', onKeyDown); });
 
     // Make the host focusable so keydown fires without clicking first
     if (!host.hasAttribute('tabindex')) host.setAttribute('tabindex', '-1');
@@ -294,7 +343,7 @@ export class DashboardContent {
     const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
     dateRow.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
 
-    const cards = (this.settings.pulseCards ?? []).filter((c) => c.enabled);
+    const cards = (ctx.settings.pulseCards ?? []).filter((c) => c.enabled);
     const radialEnabled = normalizedWidgets.some((w) => w.type === 'radial' && w.enabled);
 
     if (cards.length === 0 && !radialEnabled) return;
@@ -311,7 +360,7 @@ export class DashboardContent {
 
     const streak = cards.some((c) => c.type === 'streak') ? computeStreak(allFiles, today) : 0;
     const inboxCount = cards.some((c) => c.type === 'inbox')
-      ? countInboxFiles(this.app, this.settings.inboxPath ?? '')
+      ? countInboxFiles(this.app, ctx.settings.inboxPath ?? '')
       : 0;
     const pomodoroTimer = cards.some((c) => c.type === 'pomodoro') ? getPomodoroTimer(this.app) : null;
     let pomodoroRunning = false;
@@ -413,7 +462,7 @@ export class DashboardContent {
         break;
       }
       case 'modified-today': {
-        const count = ctx.allFiles.filter((f) => getModifiedTime(this.app, this.settings, f) >= ctx.today.getTime()).length;
+        const count = ctx.allFiles.filter((f) => getModifiedTime(this.app, widgetCtx.settings, f) >= ctx.today.getTime()).length;
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Modified' });
         el.createEl('div', { cls: 'qw-dash-pulse-value', text: String(count) });
         el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'notes today' });
@@ -477,7 +526,7 @@ export class DashboardContent {
         applyGitStatus(git.cachedStatus);
         void git.updateCachedStatus().then((fresh) => { if (el.isConnected) applyGitStatus(fresh); });
         el.addEventListener('click', (e) => {
-          if (this.settings.gitPulseCardAction === 'menu') {
+          if (widgetCtx.settings.gitPulseCardAction === 'menu') {
             const menu = new Menu();
             const cmds = (this.app as unknown as { commands: { commands: Record<string, { id: string; name: string }> } }).commands.commands;
             for (const cmd of Object.values(cmds)) {
@@ -519,7 +568,7 @@ export class DashboardContent {
         break;
       }
       case 'homepage': {
-        const homePath = this.settings.homePath;
+        const homePath = widgetCtx.settings.homePath;
         const homeFile = homePath
           ? (this.app.vault.getFileByPath(homePath) ?? this.app.metadataCache.getFirstLinkpathDest(homePath, ''))
           : null;

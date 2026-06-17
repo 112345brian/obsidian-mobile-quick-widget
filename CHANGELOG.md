@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.5 — 2026-06-17
+
+### Added
+- Sidebar dashboards can now be opened with view-state parameters through `api.openDashboardSidebar(state)`. Supported overrides include widget list, pulse cards, touched/modified counts, radial launcher mode/interaction, and note-card display settings.
+- Separate sidebar settings now cover the whole dashboard surface: widgets, list counts, pulse cards, note-card display, and dashboard radial launcher preferences.
+
+### Fixed
+- Settings changes now persist through the settings manager's real mutable settings object instead of mutating the read-only safe settings copy.
+- Open sidebar dashboards refresh when settings are saved, external settings are reloaded, or a new sidebar view state is applied.
+- Empty sidebar widget configuration now means "show no sidebar widgets" instead of silently falling back to the regular dashboard's widgets.
+
 ## 0.3.2 — 2026-06-16
 
 ### Added

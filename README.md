@@ -87,7 +87,10 @@ From your own plugin:
 
 ```ts
 const readyBoard = app.plugins.plugins['readyboard'] as
-  | { api?: { registerWidget(def: unknown): () => void } }
+  | { api?: {
+      registerWidget(def: unknown): () => void;
+      openDashboardSidebar(state?: unknown): void;
+    } }
   | undefined;
 
 const unregister = readyBoard?.api?.registerWidget({
@@ -104,12 +107,27 @@ unregister?.();
 
 Once registered, your widget shows up as a disabled-by-default toggle in ReadyBoard's dashboard settings — the user opts in exactly like a built-in. If ReadyBoard isn't installed, `app.plugins.plugins['readyboard']` is `undefined` and the optional chaining above just no-ops.
 
+You can also open the sidebar dashboard with temporary view-state parameters:
+
+```ts
+readyBoard?.api?.openDashboardSidebar({
+  recentListCount: 6,
+  modifiedListCount: 6,
+  radialMode: 'recents',
+  widgets: [
+    { type: 'radial', enabled: true },
+    { type: 'continue', enabled: true },
+  ],
+});
+```
+
 **The context object (`ctx`) your `render` function receives:**
 
 | Field | Type | What it's for |
 |---|---|---|
 | `app` | `App` | The usual Obsidian API surface |
 | `settings` | `ReadonlyDeep<PluginSettings>` | ReadyBoard's own settings, read-only |
+| `surface` | `'modal' \| 'sidebar'` | Which dashboard surface is rendering the widget |
 | `getPlugin(id)` | `<T>(id: string) => T \| undefined` | Look up another installed plugin's instance by manifest id (e.g. integrating with a sibling plugin the way `src/widgets/git.ts`/`pomodoro.ts` do) — returns `undefined` if it's not installed/enabled. You're still responsible for checking the shape of what comes back before calling into it. |
 | `close()` | `() => void` | Dismiss the dashboard (closes the modal, or collapses the sidebar) |
 | `openFile(file)` | `(file: TFile) => void` | Closes the dashboard, then opens `file` — the common "tap a note" pattern |
@@ -119,7 +137,7 @@ Once registered, your widget shows up as a disabled-by-default toggle in ReadyBo
 
 `render` can be `async` (e.g. to read a file before showing anything), and is called fresh every time the dashboard renders — do your own DOM cleanup the same way the rest of the dashboard does, since `root` is discarded on the next render/close.
 
-**If your widget shows something that changes on its own** (a countdown, another plugin's live state), prefer subscribing directly to that plugin's own reactive API if it has one (e.g. a Svelte store) rather than duplicating its timing logic. The sidebar surface stays "warm" between opens (`render` only runs once per session, not on every reveal) and collapsing it is purely visual — it doesn't tear down your view, so a plain subscribe-and-redraw stays accurate the whole time the dashboard is hidden. Tear the subscription down via `onCleanup`. Only reach for your own `setInterval` loop if the source plugin has no push-based way to observe changes. ReadyBoard's own Pomodoro widget (`src/widgets/pomodoro.ts`) is a working example: it subscribes to the Pomodoro Timer plugin's own store directly, with no extra polling.
+**If your widget shows something that changes on its own** (a countdown, another plugin's live state), prefer subscribing directly to that plugin's own reactive API if it has one (e.g. a Svelte store) rather than duplicating its timing logic. The sidebar surface stays "warm" between ordinary opens and collapsing it is purely visual — it doesn't tear down your view, so a plain subscribe-and-redraw stays accurate the whole time the dashboard is hidden. It can still re-render when settings or sidebar view-state parameters change. Tear subscriptions down via `onCleanup`. Only reach for your own `setInterval` loop if the source plugin has no push-based way to observe changes. ReadyBoard's own Pomodoro widget (`src/widgets/pomodoro.ts`) is a working example: it subscribes to the Pomodoro Timer plugin's own store directly, with no extra polling.
 
 Your widget's source files live wherever you like — there's no folder-scanning step. ReadyBoard's own built-ins follow a one-file-per-widget layout (`src/widgets/*.ts`, each exporting a single definition object) purely as a convention; nothing about the API requires it.
 
@@ -135,23 +153,17 @@ Your widget's source files live wherever you like — there's no folder-scanning
 | Filename format | Untitled + date, Zettelkasten (YYYYMMDDHHmmss), or Custom |
 | Custom format | Token-based: `YYYY` `YY` `MM` `DD` `HH` `mm` `ss` — e.g. `YYMMDD_HHmmss` |
 
-### Note Card
-| Setting | Description |
-|---|---|
-| Show breadcrumb parent | Show the parent note above each card title |
-| Show tags | Show frontmatter tags below the title row |
-| Show backlink count | Show `← N` inline with the date |
-| Show preview | Show a short text excerpt from the note body |
-| Extra frontmatter fields | Fields to surface per-note when present (e.g. `status`, `type`) |
-
 ### Dashboard
 | Setting | Description |
 |---|---|
 | Handedness | Right-handed mode right-aligns headers and controls |
+| Separate sidebar settings | Lets the regular modal dashboard and sidebar dashboard use different widget lists, counts, note-card display settings, pulse cards, and dashboard radial launcher settings |
 | Recently touched count | How many files in the Touched list (default 15) |
 | Recently modified count | How many files in the Modified list (default 15) |
 | Show breadcrumbs | Show parent note above each item in the list |
 | Breadcrumb field override | Custom frontmatter field for parent (default: `up`) |
+| Show tags / backlinks / preview | Controls what each note row shows |
+| Extra frontmatter fields | Fields to surface per-note when present (e.g. `status`, `type`) |
 | Modified date field | Frontmatter field for modified date (default: file mtime) |
 | Continue — excluded paths | Files/folders to hide from the Touched list |
 
@@ -159,6 +171,7 @@ Your widget's source files live wherever you like — there's no folder-scanning
 | Setting | Description |
 |---|---|
 | Per-card column span | 1, 2, or 3 columns in the pulse grid |
+| Separate sidebar settings | When enabled, pulse cards are edited separately for regular and sidebar dashboards |
 | Inbox folder path | Folder to count for the Inbox pulse card |
 | Git card tap action | Commit-and-sync (default) or open git command menu |
 
@@ -167,6 +180,7 @@ Your widget's source files live wherever you like — there's no folder-scanning
 |---|---|
 | Default mode | Which mode the radial opens in (default: Breadcrumbs) |
 | Dashboard radial section | Which radial section the dashboard launcher expands into |
+| Dashboard radial interaction | Press-and-hold or tap-to-toggle for the dashboard launcher; split per surface when separate sidebar settings are enabled |
 | Remember last mode | Reopen in whatever mode you last used, instead of the default |
 | Connect radial & dashboard | Enables the swipe-to-dashboard gesture |
 | Radial Commands | Six configurable slots for Commands mode (label, icon, icon type, action) |

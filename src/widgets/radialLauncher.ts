@@ -245,7 +245,10 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
       if (!card.isConnected) return;
       mode = MODE_ORDER[(MODE_ORDER.indexOf(mode) + 1) % MODE_ORDER.length]!;
       if (ctx.settings.radialRememberLast) {
-        void ctx.editSettings((s) => { s.dashboardRadialLastMode = mode; });
+        void ctx.editSettings((s) => {
+          if (ctx.surface === 'sidebar' && s.dashboardSeparateSettings) s.sidebarDashboardRadialLastMode = mode;
+          else s.dashboardRadialLastMode = mode;
+        });
       }
       renderCard();
     }, DOUBLE_TAP_MS);

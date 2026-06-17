@@ -15,7 +15,7 @@ export class DashboardModal extends Modal {
 
   public constructor(
     app: App,
-    settings: ReadonlyDeep<PluginSettings>,
+    settings: ReadonlyDeep<PluginSettings> | (() => ReadonlyDeep<PluginSettings>),
     editSettings: (mutate: (settings: PluginSettings) => void | Promise<void>) => Promise<void>,
     widgetRegistry: DashboardWidgetRegistry,
   ) {

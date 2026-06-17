@@ -53,7 +53,7 @@ export class ReadyBoardSettingsModal extends Modal {
    *  (via onOpen) and the native Obsidian settings tab (inline, no modal). */
   public renderInto(container: HTMLElement): void {
     container.empty();
-    const s = this.plugin.settings as PluginSettings;
+    const s = this.plugin.settingsManager.settingsWrapper.settings as unknown as PluginSettings;
     const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.plugin.dashboardWidgetRegistry.ids()])];
     s.dashboardWidgets = normalizeDashboardWidgets(s.dashboardWidgets as DashboardWidget[], knownIds);
 
@@ -78,8 +78,8 @@ export class ReadyBoardSettingsModal extends Modal {
 
   private renderTab(): void {
     this.body.empty();
-    const s = this.plugin.settings as PluginSettings;
-    const save = (): void => { void this.plugin.settingsManager.saveToFile(); };
+    const s = this.plugin.settingsManager.settingsWrapper.settings as unknown as PluginSettings;
+    const save = (): void => { void this.plugin.settingsManager.editAndSave(() => undefined, { source: 'settings-ui' }); };
 
     switch (this.activeTab) {
       case 'general':   this.renderGeneral(s, save); break;
@@ -94,6 +94,28 @@ export class ReadyBoardSettingsModal extends Modal {
     const scrollTop = this.body.scrollTop;
     this.renderTab();
     this.body.scrollTop = scrollTop;
+  }
+
+  private clonePulseCard(card: PulseCard): PulseCard {
+    const clone: PulseCard = { ...card };
+    if (card.quickAction) clone.quickAction = { ...card.quickAction };
+    return clone;
+  }
+
+  private seedSidebarDashboardSettings(s: PluginSettings, knownIds: string[]): void {
+    s.sidebarWidgets = normalizeDashboardWidgets(s.dashboardWidgets as DashboardWidget[], knownIds).map((w) => ({ ...w }));
+    s.sidebarPulseCards = (s.pulseCards ?? []).map((card) => this.clonePulseCard(card));
+    s.sidebarRecentListCount = s.recentListCount;
+    s.sidebarModifiedListCount = s.modifiedListCount;
+    s.sidebarDashboardRadialMode = s.dashboardRadialMode;
+    s.sidebarDashboardRadialLastMode = s.dashboardRadialLastMode;
+    s.sidebarDashboardRadialInteraction = s.dashboardRadialInteraction;
+    s.sidebarShowBreadcrumbs = s.showBreadcrumbs;
+    s.sidebarBreadcrumbField = s.breadcrumbField;
+    s.sidebarCardShowTags = s.cardShowTags;
+    s.sidebarCardShowPreview = s.cardShowPreview;
+    s.sidebarCardShowBacklinks = s.cardShowBacklinks;
+    s.sidebarCardFrontmatterFields = [...(s.cardFrontmatterFields ?? [])];
   }
 
   // ── General ──────────────────────────────────────────────────────────────
@@ -145,24 +167,6 @@ export class ReadyBoardSettingsModal extends Modal {
     customEl = cs.settingEl;
     customEl.style.display = s.newNoteFilenameFormat === 'custom' ? '' : 'none';
 
-    el.createEl('h3', { text: 'Note Card' });
-    el.createEl('p', { cls: 'setting-item-description', text: 'Controls what each note row shows in the Touched and Modified lists.' });
-
-    new Setting(el).setName('Show tags').addToggle((t) => t.setValue(s.cardShowTags ?? false).onChange((v) => { s.cardShowTags = v; save(); }));
-    new Setting(el).setName('Show backlink count').addToggle((t) => t.setValue(s.cardShowBacklinks ?? true).onChange((v) => { s.cardShowBacklinks = v; save(); }));
-    new Setting(el).setName('Show preview').setDesc('Short text excerpt from the note body.')
-      .addToggle((t) => t.setValue(s.cardShowPreview ?? true).onChange((v) => { s.cardShowPreview = v; save(); }));
-    new Setting(el).setName('Show breadcrumbs').setDesc('Show parent note above each item in the list.')
-      .addToggle((t) => t.setValue(s.showBreadcrumbs ?? false).onChange((v) => { s.showBreadcrumbs = v; save(); }));
-    new Setting(el).setName('Breadcrumb field override').setDesc('Custom frontmatter field for parent. Leave blank to use "up".')
-      .addText((t) => t.setPlaceholder('up').setValue(s.breadcrumbField ?? '')
-        .onChange((v) => { s.breadcrumbField = v.trim(); save(); }));
-    new Setting(el).setName('Extra frontmatter fields').setDesc('One per line (e.g. status, type). Shows only when present.')
-      .addTextArea((t) => {
-        t.setPlaceholder('status\ntype').setValue((s.cardFrontmatterFields ?? []).join('\n'))
-          .onChange((v) => { s.cardFrontmatterFields = v.split('\n').map((f) => f.trim()).filter(Boolean); save(); });
-      });
-
     el.createEl('h3', { text: 'Continue List' });
     el.createEl('div', { cls: 'setting-item-name', text: 'Excluded paths' });
     el.createEl('div', { cls: 'setting-item-description', text: 'Files or folders to hide from the Touched list.' });
@@ -179,8 +183,52 @@ export class ReadyBoardSettingsModal extends Modal {
 
   private renderPulse(s: PluginSettings, save: () => void): void {
     const el = this.body;
-    const cards = s.pulseCards as PulseCard[];
+    const cardLists = s.dashboardSeparateSettings
+      ? [s.pulseCards as PulseCard[], s.sidebarPulseCards as PulseCard[]]
+      : [s.pulseCards as PulseCard[]];
 
+    if (s.dashboardSeparateSettings) {
+      el.createEl('h3', { text: 'Overlay Dashboard' });
+      this.renderPulseCardList(el, s.pulseCards as PulseCard[], () => {
+        s.pulseCards = DEFAULT_PULSE_CARDS.map((c) => this.clonePulseCard(c));
+      }, save);
+
+      el.createEl('h3', { text: 'Sidebar Dashboard' });
+      this.renderPulseCardList(el, s.sidebarPulseCards as PulseCard[], () => {
+        s.sidebarPulseCards = DEFAULT_PULSE_CARDS.map((c) => this.clonePulseCard(c));
+      }, save);
+    } else {
+      this.renderPulseCardList(el, s.pulseCards as PulseCard[], () => {
+        s.pulseCards = DEFAULT_PULSE_CARDS.map((c) => this.clonePulseCard(c));
+      }, save);
+    }
+
+    const cards = cardLists.flat();
+
+    // Conditional sub-settings
+    if (cards.some((c) => c.type === 'inbox')) {
+      el.createEl('h3', { text: 'Inbox' });
+      new Setting(el).setName('Inbox folder path').setDesc('e.g. "Inbox" or "Capture/Unsorted"')
+        .addText((t) => {
+          t.setPlaceholder('Inbox').setValue(s.inboxPath ?? '').onChange((v) => { s.inboxPath = v.trim(); save(); });
+          new FolderSuggest(this.app, t.inputEl);
+        });
+    }
+    if (cards.some((c) => c.type === 'git')) {
+      el.createEl('h3', { text: 'Git Card' });
+      new Setting(el).setName('Tap action')
+        .addDropdown((dd2) => dd2.addOption('sync', 'Commit and sync').addOption('menu', 'Open git menu')
+          .setValue(s.gitPulseCardAction ?? 'sync')
+          .onChange((v) => { s.gitPulseCardAction = v as 'sync' | 'menu'; save(); }));
+    }
+  }
+
+  private renderPulseCardList(
+    el: HTMLElement,
+    cards: PulseCard[],
+    reset: () => void,
+    save: () => void,
+  ): void {
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i];
       if (!card) continue;
@@ -204,24 +252,7 @@ export class ReadyBoardSettingsModal extends Modal {
       save(); this.redraw();
     };
     const resetBtn = addRow.createEl('button', { text: 'Reset' });
-    resetBtn.onclick = () => { s.pulseCards = DEFAULT_PULSE_CARDS.map((c) => ({ ...c })); save(); this.redraw(); };
-
-    // Conditional sub-settings
-    if (cards.some((c) => c.type === 'inbox')) {
-      el.createEl('h3', { text: 'Inbox' });
-      new Setting(el).setName('Inbox folder path').setDesc('e.g. "Inbox" or "Capture/Unsorted"')
-        .addText((t) => {
-          t.setPlaceholder('Inbox').setValue(s.inboxPath ?? '').onChange((v) => { s.inboxPath = v.trim(); save(); });
-          new FolderSuggest(this.app, t.inputEl);
-        });
-    }
-    if (cards.some((c) => c.type === 'git')) {
-      el.createEl('h3', { text: 'Git Card' });
-      new Setting(el).setName('Tap action')
-        .addDropdown((dd2) => dd2.addOption('sync', 'Commit and sync').addOption('menu', 'Open git menu')
-          .setValue(s.gitPulseCardAction ?? 'sync')
-          .onChange((v) => { s.gitPulseCardAction = v as 'sync' | 'menu'; save(); }));
-    }
+    resetBtn.onclick = () => { reset(); save(); this.redraw(); };
   }
 
   private renderPulseCardBlock(el: HTMLElement, cards: PulseCard[], i: number, save: () => void): void {
@@ -296,9 +327,8 @@ export class ReadyBoardSettingsModal extends Modal {
       .setDesc('Configure widgets and list counts independently for the overlay dashboard and the sidebar panel.')
       .addToggle((t) => t.setValue(s.dashboardSeparateSettings ?? false).onChange((v) => {
         s.dashboardSeparateSettings = v;
-        // Seed sidebar widgets from modal widgets on first enable so it isn't blank.
-        if (v && (!s.sidebarWidgets || s.sidebarWidgets.length === 0)) {
-          s.sidebarWidgets = normalizeDashboardWidgets(s.dashboardWidgets as DashboardWidget[], knownIds).map((w) => ({ ...w }));
+        if (v && (s.sidebarWidgets?.length ?? 0) === 0 && (s.sidebarPulseCards?.length ?? 0) === 0) {
+          this.seedSidebarDashboardSettings(s, knownIds);
         }
         save(); this.redraw();
       }));
@@ -313,6 +343,7 @@ export class ReadyBoardSettingsModal extends Modal {
         .addText((t) => t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
           .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.modifiedListCount = n; save(); } }));
       this.renderWidgetList(el, s, 'modal', knownIds, save);
+      this.renderNoteCardSettings(el, s, 'modal', save);
 
       // ── Sidebar dashboard ──
       el.createEl('h3', { text: 'Sidebar Dashboard' });
@@ -323,6 +354,7 @@ export class ReadyBoardSettingsModal extends Modal {
         .addText((t) => t.setPlaceholder('15').setValue(String(s.sidebarModifiedListCount ?? 15))
           .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.sidebarModifiedListCount = n; save(); } }));
       this.renderWidgetList(el, s, 'sidebar', knownIds, save);
+      this.renderNoteCardSettings(el, s, 'sidebar', save);
     } else {
       // ── Shared counts + widgets ──
       new Setting(el).setName('Recently touched count')
@@ -332,7 +364,67 @@ export class ReadyBoardSettingsModal extends Modal {
         .addText((t) => t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
           .onChange((v) => { const n = parseInt(v, 10); if (!isNaN(n) && n > 0) { s.modifiedListCount = n; save(); } }));
       this.renderWidgetList(el, s, 'modal', knownIds, save);
+      this.renderNoteCardSettings(el, s, 'modal', save);
     }
+  }
+
+  private renderNoteCardSettings(
+    el: HTMLElement,
+    s: PluginSettings,
+    surface: 'modal' | 'sidebar',
+    save: () => void,
+  ): void {
+    const isSidebar = surface === 'sidebar';
+    el.createEl('h3', { text: 'Note Cards' });
+    new Setting(el).setName('Show tags').addToggle((t) => t
+      .setValue(isSidebar ? s.sidebarCardShowTags : s.cardShowTags)
+      .onChange((v) => {
+        if (isSidebar) s.sidebarCardShowTags = v;
+        else s.cardShowTags = v;
+        save();
+      }));
+    new Setting(el).setName('Show backlink count').addToggle((t) => t
+      .setValue(isSidebar ? s.sidebarCardShowBacklinks : s.cardShowBacklinks)
+      .onChange((v) => {
+        if (isSidebar) s.sidebarCardShowBacklinks = v;
+        else s.cardShowBacklinks = v;
+        save();
+      }));
+    new Setting(el).setName('Show preview').setDesc('Short text excerpt from the note body.')
+      .addToggle((t) => t
+        .setValue(isSidebar ? s.sidebarCardShowPreview : s.cardShowPreview)
+        .onChange((v) => {
+          if (isSidebar) s.sidebarCardShowPreview = v;
+          else s.cardShowPreview = v;
+          save();
+        }));
+    new Setting(el).setName('Show breadcrumbs').setDesc('Show parent note above each item in the list.')
+      .addToggle((t) => t
+        .setValue(isSidebar ? s.sidebarShowBreadcrumbs : s.showBreadcrumbs)
+        .onChange((v) => {
+          if (isSidebar) s.sidebarShowBreadcrumbs = v;
+          else s.showBreadcrumbs = v;
+          save();
+        }));
+    new Setting(el).setName('Breadcrumb field override').setDesc('Custom frontmatter field for parent. Leave blank to use "up".')
+      .addText((t) => t
+        .setPlaceholder('up')
+        .setValue(isSidebar ? s.sidebarBreadcrumbField : s.breadcrumbField)
+        .onChange((v) => {
+          if (isSidebar) s.sidebarBreadcrumbField = v.trim();
+          else s.breadcrumbField = v.trim();
+          save();
+        }));
+    new Setting(el).setName('Extra frontmatter fields').setDesc('One per line (e.g. status, type). Shows only when present.')
+      .addTextArea((t) => t
+        .setPlaceholder('status\ntype')
+        .setValue((isSidebar ? s.sidebarCardFrontmatterFields : s.cardFrontmatterFields).join('\n'))
+        .onChange((v) => {
+          const fields = v.split('\n').map((f) => f.trim()).filter(Boolean);
+          if (isSidebar) s.sidebarCardFrontmatterFields = fields;
+          else s.cardFrontmatterFields = fields;
+          save();
+        }));
   }
 
   private renderWidgetList(
@@ -399,14 +491,14 @@ export class ReadyBoardSettingsModal extends Modal {
     new Setting(el).setName('Connect radial & dashboard').setDesc('Swipe down on the radial to open the dashboard.')
       .addToggle((t) => t.setValue(s.connectSurfaces ?? true).onChange((v) => { s.connectSurfaces = v; save(); }));
 
-    new Setting(el).setName('Dashboard radial section')
-      .addDropdown((d) => d.addOption('breadcrumbs', 'Breadcrumbs').addOption('commands', 'Commands').addOption('recents', 'Recents')
-        .setValue(s.dashboardRadialMode ?? 'breadcrumbs').onChange((v) => { s.dashboardRadialMode = v as RadialMode; save(); }));
-
-    new Setting(el).setName('Dashboard radial interaction')
-      .addDropdown((d) => d.addOption('press-hold', 'Press & hold').addOption('tap-toggle', 'Tap to toggle')
-        .setValue(s.dashboardRadialInteraction ?? 'press-hold')
-        .onChange((v) => { s.dashboardRadialInteraction = v as DashboardRadialInteraction; save(); }));
+    if (s.dashboardSeparateSettings) {
+      el.createEl('h3', { text: 'Overlay Dashboard Launcher' });
+      this.renderDashboardRadialSettings(el, s, 'modal', save);
+      el.createEl('h3', { text: 'Sidebar Dashboard Launcher' });
+      this.renderDashboardRadialSettings(el, s, 'sidebar', save);
+    } else {
+      this.renderDashboardRadialSettings(el, s, 'modal', save);
+    }
 
     el.createEl('h3', { text: 'Command Slots' });
 
@@ -426,6 +518,32 @@ export class ReadyBoardSettingsModal extends Modal {
       this.activeRadialSlot = 0;
       save(); this.redraw();
     }));
+  }
+
+  private renderDashboardRadialSettings(
+    el: HTMLElement,
+    s: PluginSettings,
+    surface: 'modal' | 'sidebar',
+    save: () => void,
+  ): void {
+    const isSidebar = surface === 'sidebar';
+    new Setting(el).setName('Dashboard radial section')
+      .addDropdown((d) => d.addOption('breadcrumbs', 'Breadcrumbs').addOption('commands', 'Commands').addOption('recents', 'Recents')
+        .setValue(isSidebar ? s.sidebarDashboardRadialMode : s.dashboardRadialMode)
+        .onChange((v) => {
+          if (isSidebar) s.sidebarDashboardRadialMode = v as RadialMode;
+          else s.dashboardRadialMode = v as RadialMode;
+          save();
+        }));
+
+    new Setting(el).setName('Dashboard radial interaction')
+      .addDropdown((d) => d.addOption('press-hold', 'Press & hold').addOption('tap-toggle', 'Tap to toggle')
+        .setValue(isSidebar ? s.sidebarDashboardRadialInteraction : s.dashboardRadialInteraction)
+        .onChange((v) => {
+          if (isSidebar) s.sidebarDashboardRadialInteraction = v as DashboardRadialInteraction;
+          else s.dashboardRadialInteraction = v as DashboardRadialInteraction;
+          save();
+        }));
   }
 
   private renderRadialPreview(el: HTMLElement, commands: QuickAction[]): void {

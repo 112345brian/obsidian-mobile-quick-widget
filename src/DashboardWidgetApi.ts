@@ -1,7 +1,7 @@
 import type { App, TFile } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
-import type { PluginSettings } from './PluginSettings.ts';
+import type { DashboardViewState, PluginSettings } from './PluginSettings.ts';
 
 /**
  * Everything a third-party widget's render function needs. Built fresh on
@@ -13,6 +13,9 @@ import type { PluginSettings } from './PluginSettings.ts';
 export interface DashboardWidgetContext {
   app: App;
   settings: ReadonlyDeep<PluginSettings>;
+  /** Which dashboard surface is rendering this widget. Useful when a widget
+   *  persists surface-specific state. */
+  surface: 'modal' | 'sidebar';
   /** Looks up another installed plugin's instance by its manifest id —
    *  Obsidian's plugin registry isn't part of the public API, so this wraps
    *  the unsafe cast in one place. Returns undefined if that plugin isn't
@@ -130,5 +133,6 @@ export class DashboardWidgetRegistry {
  * ReadyBoard's dashboard settings — the user opts in like any built-in.
  */
 export interface ReadyBoardApi {
+  openDashboardSidebar(state?: DashboardViewState): void;
   registerWidget(definition: DashboardWidgetDefinition): () => void;
 }

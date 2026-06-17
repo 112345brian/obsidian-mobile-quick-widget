@@ -1,12 +1,13 @@
-import type { WorkspaceLeaf } from 'obsidian';
+import type { ViewStateResult, WorkspaceLeaf } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
 import { ItemView } from 'obsidian';
 
-import type { PluginSettings } from '../PluginSettings.ts';
+import type { DashboardViewState, PluginSettings } from '../PluginSettings.ts';
 import type { DashboardWidgetRegistry } from '../DashboardWidgetApi.ts';
 
 import { DashboardContent } from '../DashboardContent.ts';
+import { normalizeDashboardViewState } from '../PluginSettings.ts';
 
 export const VIEW_TYPE_DASHBOARD = 'readyboard-dashboard';
 
@@ -19,10 +20,11 @@ export const VIEW_TYPE_DASHBOARD = 'readyboard-dashboard';
  */
 export class DashboardView extends ItemView {
   private readonly content: DashboardContent;
+  private state: DashboardViewState = {};
 
   public constructor(
     leaf: WorkspaceLeaf,
-    settings: ReadonlyDeep<PluginSettings>,
+    settings: ReadonlyDeep<PluginSettings> | (() => ReadonlyDeep<PluginSettings>),
     editSettings: (mutate: (settings: PluginSettings) => void | Promise<void>) => Promise<void>,
     widgetRegistry: DashboardWidgetRegistry,
   ) {
@@ -44,12 +46,28 @@ export class DashboardView extends ItemView {
 
   public override async onOpen(): Promise<void> {
     this.containerEl.addClass('qw-dash-host');
+    this.content.setViewState(this.state);
     await this.content.render(this.contentEl);
   }
 
   public override async onClose(): Promise<void> {
     this.content.dispose();
     this.contentEl.empty();
+  }
+
+  public override getState(): Record<string, unknown> {
+    return { ...this.state };
+  }
+
+  public override async setState(state: unknown, result: ViewStateResult): Promise<void> {
+    await super.setState(state, result);
+    this.state = normalizeDashboardViewState(state);
+    this.content.setViewState(this.state);
+    await this.content.refresh();
+  }
+
+  public async refresh(): Promise<void> {
+    await this.content.refresh();
   }
 
   /** render() only runs once, in onOpen — collapsing/revealing the sidebar

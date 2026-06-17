@@ -183,9 +183,19 @@ export class PluginSettings {
   public gitPulseCardAction: 'sync' | 'menu' = 'sync';
   public enableOverdrag = true;
   public dashboardSeparateSettings = false;
+  public sidebarPulseCards: PulseCard[] = [];
   public sidebarWidgets: DashboardWidget[] = [];
   public sidebarRecentListCount = 15;
   public sidebarModifiedListCount = 15;
+  public sidebarDashboardRadialMode: RadialMode = 'breadcrumbs';
+  public sidebarDashboardRadialLastMode: RadialMode = 'breadcrumbs';
+  public sidebarDashboardRadialInteraction: DashboardRadialInteraction = 'press-hold';
+  public sidebarShowBreadcrumbs = false;
+  public sidebarBreadcrumbField = '';
+  public sidebarCardShowTags = false;
+  public sidebarCardShowPreview = true;
+  public sidebarCardShowBacklinks = true;
+  public sidebarCardFrontmatterFields: string[] = [];
   public cardShowTags = false;
   public cardShowPreview = true;
   public cardShowBacklinks = true;
@@ -202,3 +212,109 @@ export type RadialMode = 'breadcrumbs' | 'commands' | 'recents';
 //   select; tap the center again to cycle modes; double-tap the center
 //   (or tap outside the ring) to collapse.
 export type DashboardRadialInteraction = 'press-hold' | 'tap-toggle';
+
+export interface DashboardViewState {
+  breadcrumbField?: string;
+  cardFrontmatterFields?: string[];
+  cardShowBacklinks?: boolean;
+  cardShowPreview?: boolean;
+  cardShowTags?: boolean;
+  modifiedListCount?: number;
+  pulseCards?: PulseCard[];
+  radialInteraction?: DashboardRadialInteraction;
+  radialMode?: RadialMode;
+  recentListCount?: number;
+  showBreadcrumbs?: boolean;
+  widgets?: DashboardWidget[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function positiveInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function stringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : undefined;
+}
+
+function radialMode(value: unknown): RadialMode | undefined {
+  return value === 'breadcrumbs' || value === 'commands' || value === 'recents' ? value : undefined;
+}
+
+function dashboardRadialInteraction(value: unknown): DashboardRadialInteraction | undefined {
+  return value === 'press-hold' || value === 'tap-toggle' ? value : undefined;
+}
+
+function dashboardWidgets(value: unknown): DashboardWidget[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const widgets: DashboardWidget[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || typeof item['type'] !== 'string' || typeof item['enabled'] !== 'boolean') continue;
+    widgets.push({ type: item['type'], enabled: item['enabled'] });
+  }
+  return widgets;
+}
+
+function pulseCards(value: unknown): PulseCard[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const cards: PulseCard[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || typeof item['type'] !== 'string' || typeof item['enabled'] !== 'boolean') continue;
+    if (!(item['type'] in PULSE_CARD_LABELS)) continue;
+    const size = item['size'];
+    const card: PulseCard = {
+      type: item['type'] as PulseCardType,
+      enabled: item['enabled'],
+    };
+    if (size === 1 || size === 2 || size === 3) card.size = size;
+    const quickAction = item['quickAction'];
+    if (card.type === 'quick-action' && isRecord(quickAction) && typeof quickAction['label'] === 'string' && typeof quickAction['icon'] === 'string') {
+      const action: QuickAction = {
+        label: quickAction['label'],
+        icon: quickAction['icon'],
+        iconType: quickAction['iconType'] === 'glyph' ? 'glyph' : 'lucide',
+        action: quickAction['action'] === 'homepage' || quickAction['action'] === 'command' || quickAction['action'] === 'append-to-note'
+          ? quickAction['action']
+          : 'new-note',
+      };
+      if (typeof quickAction['commandId'] === 'string') action.commandId = quickAction['commandId'];
+      if (typeof quickAction['notePath'] === 'string') action.notePath = quickAction['notePath'];
+      if (typeof quickAction['appendTemplate'] === 'string') action.appendTemplate = quickAction['appendTemplate'];
+      card.quickAction = action;
+    }
+    cards.push(card);
+  }
+  return cards;
+}
+
+export function normalizeDashboardViewState(state: unknown): DashboardViewState {
+  if (!isRecord(state)) return {};
+
+  const normalized: DashboardViewState = {};
+  const recentListCount = positiveInteger(state['recentListCount']);
+  const modifiedListCount = positiveInteger(state['modifiedListCount']);
+  const widgets = dashboardWidgets(state['widgets']);
+  const cards = pulseCards(state['pulseCards']);
+  const mode = radialMode(state['radialMode'] ?? state['dashboardRadialMode']);
+  const interaction = dashboardRadialInteraction(state['radialInteraction'] ?? state['dashboardRadialInteraction']);
+  const fields = stringArray(state['cardFrontmatterFields']);
+
+  if (recentListCount !== undefined) normalized.recentListCount = recentListCount;
+  if (modifiedListCount !== undefined) normalized.modifiedListCount = modifiedListCount;
+  if (widgets) normalized.widgets = widgets;
+  if (cards) normalized.pulseCards = cards;
+  if (mode) normalized.radialMode = mode;
+  if (interaction) normalized.radialInteraction = interaction;
+  if (fields) normalized.cardFrontmatterFields = fields;
+
+  for (const key of ['showBreadcrumbs', 'cardShowTags', 'cardShowPreview', 'cardShowBacklinks'] as const) {
+    if (typeof state[key] === 'boolean') normalized[key] = state[key];
+  }
+
+  if (typeof state['breadcrumbField'] === 'string') normalized.breadcrumbField = state['breadcrumbField'].trim();
+
+  return normalized;
+}
