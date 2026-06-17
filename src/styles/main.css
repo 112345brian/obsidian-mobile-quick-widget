@@ -1414,3 +1414,48 @@
   padding-top: 12px;
   border-top: 1px solid var(--background-modifier-border);
 }
+
+/* Chip list (excluded paths etc.) */
+
+.qw-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+  min-height: 24px;
+}
+
+.qw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 10px;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+  font-size: 0.83em;
+  color: var(--text-normal);
+}
+
+.qw-chip-remove {
+  border: none;
+  background: transparent;
+  padding: 0 2px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.qw-chip-remove:hover { color: var(--text-error); }
+
+.qw-chip-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.qw-chip-input {
+  flex: 1;
+  min-width: 0;
+}

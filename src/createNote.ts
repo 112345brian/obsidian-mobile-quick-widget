@@ -88,7 +88,14 @@ export async function createNote(app: App, settings: ReadonlyDeep<PluginSettings
 
   if (templateFile) {
     const templater = getTemplater(app);
-    await templater?.overwrite_file_commands?.(file, false);
+    if (templater?.overwrite_file_commands) {
+      try {
+        await templater.overwrite_file_commands(file, false);
+      } catch (err) {
+        console.error('ReadyBoard: Templater processing failed', err);
+        new Notice('Note created, but Templater processing failed. Check the console for details.');
+      }
+    }
   }
 
   return file;

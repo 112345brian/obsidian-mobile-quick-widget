@@ -1,5 +1,7 @@
 import { Modal, Setting } from 'obsidian';
 
+import { FileSuggest, FolderSuggest, renderChipList } from './PathSuggest.ts';
+
 import type { DashboardRadialInteraction, DashboardWidget, NewNoteFilenameFormat, PulseCard, QuickAction, QuickActionIconType, RadialMode } from './PluginSettings.ts';
 import type { Plugin } from './Plugin.ts';
 
@@ -92,7 +94,10 @@ export class ReadyBoardSettingsModal extends Modal {
     new Setting(el)
       .setName('Homepage file path')
       .setDesc('e.g. "Home.md" or "Notes/Index.md"')
-      .addText((t) => t.setPlaceholder('Home.md').setValue(s.homePath).onChange((v) => { s.homePath = v.trim(); save(); }));
+      .addText((t) => {
+        t.setPlaceholder('Home.md').setValue(s.homePath).onChange((v) => { s.homePath = v.trim(); save(); });
+        new FileSuggest(this.app, t.inputEl);
+      });
 
     new Setting(el).setName('Handedness').setDesc('Right-handed mode right-aligns controls.')
       .addDropdown((d) => d.addOption('left', 'Left-handed').addOption('right', 'Right-handed')
@@ -101,12 +106,16 @@ export class ReadyBoardSettingsModal extends Modal {
     el.createEl('h3', { text: 'New Note' });
 
     new Setting(el).setName('Folder')
-      .addText((t) => t.setPlaceholder('Inbox').setValue(s.newNoteFolder)
-        .onChange((v) => { s.newNoteFolder = v.trim(); save(); }));
+      .addText((t) => {
+        t.setPlaceholder('Inbox').setValue(s.newNoteFolder).onChange((v) => { s.newNoteFolder = v.trim(); save(); });
+        new FolderSuggest(this.app, t.inputEl);
+      });
 
     new Setting(el).setName('Template')
-      .addText((t) => t.setPlaceholder('Templates/New Note.md').setValue(s.newNoteTemplate)
-        .onChange((v) => { s.newNoteTemplate = v.trim(); save(); }));
+      .addText((t) => {
+        t.setPlaceholder('Templates/New Note.md').setValue(s.newNoteTemplate).onChange((v) => { s.newNoteTemplate = v.trim(); save(); });
+        new FileSuggest(this.app, t.inputEl);
+      });
 
     let customEl: HTMLElement | null = null;
     new Setting(el).setName('Filename format')
@@ -140,12 +149,15 @@ export class ReadyBoardSettingsModal extends Modal {
       });
 
     el.createEl('h3', { text: 'Continue List' });
-    new Setting(el).setName('Excluded paths').setDesc('Files or folders to hide. One per line. Folders end with /.')
-      .addTextArea((t) => {
-        t.setPlaceholder('Meta/Home.md\nTemplates/').setValue((s.continueExcluded ?? []).join('\n'))
-          .onChange((v) => { s.continueExcluded = v.split('\n').map((p) => p.trim()).filter(Boolean); save(); });
-        t.inputEl.rows = 4;
-      });
+    el.createEl('div', { cls: 'setting-item-name', text: 'Excluded paths' });
+    el.createEl('div', { cls: 'setting-item-description', text: 'Files or folders to hide from the Touched list.' });
+    renderChipList(
+      el, this.app,
+      () => s.continueExcluded ?? [],
+      (v) => { s.continueExcluded = v; save(); },
+      'Add folder or file path…',
+      true,
+    );
   }
 
   // ── Pulse Cards ───────────────────────────────────────────────────────────
@@ -183,8 +195,10 @@ export class ReadyBoardSettingsModal extends Modal {
     if (cards.some((c) => c.type === 'inbox')) {
       el.createEl('h3', { text: 'Inbox' });
       new Setting(el).setName('Inbox folder path').setDesc('e.g. "Inbox" or "Capture/Unsorted"')
-        .addText((t) => t.setPlaceholder('Inbox').setValue(s.inboxPath ?? '')
-          .onChange((v) => { s.inboxPath = v.trim(); save(); }));
+        .addText((t) => {
+          t.setPlaceholder('Inbox').setValue(s.inboxPath ?? '').onChange((v) => { s.inboxPath = v.trim(); save(); });
+          new FolderSuggest(this.app, t.inputEl);
+        });
     }
     if (cards.some((c) => c.type === 'git')) {
       el.createEl('h3', { text: 'Git Card' });
@@ -246,6 +260,9 @@ export class ReadyBoardSettingsModal extends Modal {
 
   private renderDashboard(s: PluginSettings, save: () => void): void {
     const el = this.body;
+
+    new Setting(el).setName('Overdrag to new note').setDesc('Pull down past the top of the dashboard to instantly create a new note.')
+      .addToggle((t) => t.setValue(s.enableOverdrag !== false).onChange((v) => { s.enableOverdrag = v; save(); }));
 
     new Setting(el).setName('Sidebar side')
       .addDropdown((d) => d.addOption('right', 'Right').addOption('left', 'Left')

@@ -38,8 +38,13 @@ export type DashboardWidgetType = string;
 // (Note: vault "trash"/needs-review surfaces as a Pulse Card, not a
 // dashboard widget — there's no 'trash' widget type.)
 export const BUILTIN_DASHBOARD_WIDGET_TYPES: DashboardWidgetType[] = [
-  'radial', 'graph', 'continue', 'tasks', 'new-note', 'pomodoro',
+  'radial', 'graph', 'continue', 'tasks', 'more-actions', 'pomodoro',
 ];
+
+// Renamed widget ids — old saved values are rewritten on load.
+const WIDGET_ID_RENAMES: Record<string, string> = {
+  'new-note': 'more-actions',
+};
 
 export interface DashboardWidget {
   type: DashboardWidgetType;
@@ -87,11 +92,16 @@ export function normalizeDashboardWidgets(
   widgets: readonly DashboardWidget[],
   knownIds: readonly string[] = BUILTIN_DASHBOARD_WIDGET_TYPES,
 ): DashboardWidget[] {
+  // Rename pass: rewrite stale ids before anything else touches the list.
+  const renamed = widgets.map((w) =>
+    WIDGET_ID_RENAMES[w.type] ? { ...w, type: WIDGET_ID_RENAMES[w.type] as string } : w,
+  );
+
   const output: DashboardWidget[] = [];
   const seen = new Set<string>();
-  const hasSavedRadial = widgets.some((widget) => widget.type === 'radial');
+  const hasSavedRadial = renamed.some((widget) => widget.type === 'radial');
 
-  for (const widget of widgets) {
+  for (const widget of renamed) {
     if (seen.has(widget.type)) continue;
     if (widget.type === 'graph' && widget.enabled && !hasSavedRadial && knownIds.includes('radial')) {
       output.push({ type: 'radial', enabled: true });
@@ -171,6 +181,7 @@ export class PluginSettings {
   public radialCommands: QuickAction[] = RADIAL_COMMAND_DEFAULTS.map((c) => ({ ...c }));
   public dashboardSidebarSide: 'left' | 'right' = 'right';
   public gitPulseCardAction: 'sync' | 'menu' = 'sync';
+  public enableOverdrag = true;
   public cardShowTags = false;
   public cardShowPreview = true;
   public cardShowBacklinks = true;

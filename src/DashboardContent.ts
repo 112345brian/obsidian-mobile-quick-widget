@@ -157,6 +157,7 @@ export class DashboardContent {
     if (this.settings.handedness === 'right') inner.addClass('qw-dash--right');
 
     // Overdrag-to-new-note indicator (hidden above content until pulled)
+    const overdragEnabled = this.settings.enableOverdrag !== false;
     const overdrag = inner.createEl('div', { cls: 'qw-overdrag' });
     overdrag.createEl('div', { cls: 'qw-overdrag-icon', text: '+' });
 
@@ -178,7 +179,7 @@ export class DashboardContent {
       }
     }
 
-    this.attachOverdrag(host, overdrag);
+    if (overdragEnabled) this.attachOverdrag(host, overdrag);
     this.attachKeyNav(host);
   }
 

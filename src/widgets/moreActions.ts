@@ -21,7 +21,7 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
 }
 
 export const moreActionsWidget: DashboardWidgetDefinition = {
-  id: 'new-note',
+  id: 'more-actions',
   label: 'More Actions',
   render,
 };
