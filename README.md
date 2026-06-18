@@ -153,8 +153,8 @@ Your widget's source files live wherever you like — there's no folder-scanning
 ### New note
 | Setting | Description |
 |---|---|
-| New note folder | Folder to create notes in (blank = vault root) |
-| New note template | Path to a template file (Templater supported) |
+| New note folder | Folder to create notes in (blank = Obsidian Unique Note folder when configured, otherwise vault root) |
+| New note template | Path to a template file, or a Templater template name. Templater scripts and core `{{date}}`/`{{title}}` tokens are supported. Blank falls back to the Obsidian Unique Note template when configured. |
 | Filename format | Untitled + date, Zettelkasten (YYYYMMDDHHmmss), or Custom |
 | Custom format | Token-based: `YYYY` `YY` `MM` `DD` `HH` `mm` `ss` — e.g. `YYMMDD_HHmmss` |
 

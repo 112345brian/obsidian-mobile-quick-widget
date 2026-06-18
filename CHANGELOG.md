@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.9 — 2026-06-18
+
+### Fixed
+- New-note creation now resolves Obsidian Unique Note settings as a fallback when ReadyBoard's own folder/template fields are blank.
+- Configured template files now run through Templater's create-new-note API when Templater is installed, so user scripts and `tp.file.*` context execute against the created note instead of copied template text.
+- Core Obsidian template placeholders such as `{{date:YYYY-MM-DDTHH:mm:ss}}`, `{{time}}`, and `{{title}}` are expanded after template insertion.
+
 ## 0.3.8 — 2026-06-17
 
 ### Fixed
