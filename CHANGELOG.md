@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Added CI and release guardrails for lint/build validation, exact-tag release checks, local hot-reload installation, and a dashboard/radial smoke checklist.
+
 ## 0.3.10 — 2026-06-18
 
 ### Fixed

@@ -229,6 +229,13 @@ The plugin gracefully degrades when these aren't installed:
 window.DEBUG.enable('readyboard');
 ```
 
+## Release Guardrails
+
+- CI runs `npm run lint` and `npm run build` on pushes and pull requests.
+- Tagged releases run `npm run release:check`, lint, and build before publishing GitHub release assets.
+- `npm run install:local` builds, copies `main.js`, `manifest.json`, and `styles.css` into the local ReadyBoard vault plugin folder, and touches `.hotreload`.
+- Use [the smoke checklist](docs/SMOKE_CHECKLIST.md) before merging or releasing dashboard/radial/note-creation changes.
+
 ---
 
 ## License
