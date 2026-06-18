@@ -1,3 +1,4 @@
+import type { EventRef } from 'obsidian';
 import type { ExtractReadonlyPluginSettingsWrapper } from 'obsidian-dev-utils/obsidian/plugin/plugin-types-base';
 
 import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-base';
@@ -17,6 +18,10 @@ import {
  DashboardView, VIEW_TYPE_DASHBOARD
 } from './Views/DashboardView.ts';
 import { BUILTIN_WIDGETS } from './widgets/index.ts';
+
+interface WorkspaceEvents {
+  on(name: string, callback: () => void): EventRef;
+}
 
 export class Plugin extends PluginBase<PluginTypes> {
   /** Holds every dashboard widget — built-ins and third-party alike, through
@@ -90,6 +95,13 @@ export class Plugin extends PluginBase<PluginTypes> {
     this.registerEvent(this.app.metadataCache.on('changed', (file) => {
       if (file === this.app.workspace.getActiveFile()) { this.queueDashboardSidebarRefresh(); }
     }));
+
+    const workspaceEvents = this.app.workspace as unknown as WorkspaceEvents;
+    for (const eventName of ['obsidian-git:status-changed', 'obsidian-git:refreshed', 'obsidian-git:refresh', 'obsidian-git:head-change']) {
+      this.registerEvent(workspaceEvents.on(eventName, () => {
+        this.queueDashboardSidebarRefresh();
+      }));
+    }
   }
 
   protected override async onLoadSettings(

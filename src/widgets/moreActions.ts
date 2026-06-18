@@ -1,10 +1,9 @@
-import { setIcon } from 'obsidian';
-
 import type {
  DashboardWidgetContext, DashboardWidgetDefinition
 } from '../DashboardWidgetApi.ts';
 
 import { executeQuickAction } from '../quickActions.ts';
+import { renderQuickActionIcon } from '../renderQuickActionIcon.ts';
 
 function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
   const actions = ctx.settings.quickActions ?? [];
@@ -16,7 +15,7 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
   for (const action of actions) {
     const btn = row.createEl('button', { cls: 'qw-dash-action-btn' });
     const iconEl = btn.createEl('span', { cls: 'qw-dash-action-icon' });
-    setIcon(iconEl, action.icon || 'zap');
+    renderQuickActionIcon(iconEl, action);
     btn.createEl('span', { text: action.label });
     btn.addEventListener('click', () => { void executeQuickAction(ctx.app, ctx.settings, action, ctx.close); });
   }

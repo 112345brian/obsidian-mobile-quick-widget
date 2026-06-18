@@ -3,6 +3,8 @@
 ## 0.3.9 — 2026-06-18
 
 ### Fixed
+- Git pulse cards now refresh from Obsidian Git events without recursively forcing sidebar refreshes, and contextual mode treats conflicts or local changed/staged files as relevant.
+- Quick-action glyph icons now render as literal glyphs in pulse cards, dashboard action buttons, and radial command slots instead of being sent through Lucide icon lookup.
 - New-note creation now resolves Obsidian Unique Note settings as a fallback when ReadyBoard's own folder/template fields are blank.
 - Configured template files now run through Templater's create-new-note API when Templater is installed, so user scripts and `tp.file.*` context execute against the created note instead of copied template text.
 - Core Obsidian template placeholders such as `{{date:YYYY-MM-DDTHH:mm:ss}}`, `{{time}}`, and `{{title}}` are expanded after template insertion.
@@ -25,7 +27,7 @@
 - Added a References pulse card that appears only when the active note contains citekeys and opens Bripey Citation Suite's reference list.
 
 ### Changed
-- Git pulse cards only surface in contextual mode when conflicts are present.
+- Git pulse cards only surface in contextual mode when conflicts or local changed/staged files are present.
 - Pomodoro pulse cards now remain relevant while active or for an hour after a visible timer session was used.
 
 ## 0.3.5 — 2026-06-17

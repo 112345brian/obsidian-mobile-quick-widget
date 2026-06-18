@@ -69,7 +69,7 @@ An opaque bottom-sheet modal with modular widgets:
 - Homepage — opens your configured home note
 - Quick action — runs any configured action
 
-Pulse cards have separate desktop and mobile visibility modes. Desktop defaults to `Contextual`; mobile defaults to `Always`. Contextual mode hides passive cards; trash/inbox/references show only with current items, Git shows only with conflicts, and Pomodoro shows only while active or recently used.
+Pulse cards have separate desktop and mobile visibility modes. Desktop defaults to `Contextual`; mobile defaults to `Always`. Contextual mode hides passive cards; trash/inbox/references show only with current items, Git shows only with conflicts or local changed/staged files, and Pomodoro shows only while active or recently used.
 
 Each card has a column-span setting (1, 2, or 3 columns). Span-wide cards that would collide with the radial slot are pushed to the next row.
 

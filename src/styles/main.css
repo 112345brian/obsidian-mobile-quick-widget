@@ -390,6 +390,26 @@
   stroke: var(--qw-purple-bright);
 }
 
+.qw-action-icon--glyph {
+  color: var(--qw-purple-bright);
+  font-family: var(--qw-mono);
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.qw-action-icon--lucide {
+  color: var(--qw-purple-bright);
+}
+
+.qw-action-icon--lucide svg {
+  stroke: currentColor;
+}
+
+.qw-dash-pulse-action-icon.qw-action-icon--glyph {
+  font-size: 18px;
+}
+
 /* ── Section label ── */
 
 .qw-dash-section-label {
@@ -932,6 +952,10 @@
   height: 18px;
 }
 
+.qw-dash-radial-mini-icon.qw-action-icon--glyph {
+  font-size: 18px;
+}
+
 .qw-dash-radial-mini-arrow {
   font-family: var(--qw-mono);
   font-size: 11px;
@@ -1017,6 +1041,10 @@
   width: 15px;
   height: 15px;
   stroke: var(--qw-purple-bright);
+}
+
+.qw-dash-action-icon.qw-action-icon--glyph {
+  font-size: 15px;
 }
 
 /* ── Append prompt ──────────────────────────────────────────────────────────── */
@@ -1231,6 +1259,7 @@
   color: var(--r-purple-bright);
 }
 .qw-radial-btn-icon svg { width: 20px; height: 20px; }
+.qw-radial-btn-icon.qw-action-icon--glyph { font-size: 20px; }
 
 /* Breadcrumb arrow + title inside button */
 .qw-radial-bc-stack {

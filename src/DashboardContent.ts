@@ -1,5 +1,5 @@
 import type {
- App, TFile
+ App, EventRef, TFile
 } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
@@ -22,6 +22,7 @@ import {
  BUILTIN_DASHBOARD_WIDGET_TYPES, normalizeDashboardWidgets
 } from './PluginSettings.ts';
 import { executeQuickAction } from './quickActions.ts';
+import { renderQuickActionIcon } from './renderQuickActionIcon.ts';
 import { radialLauncherWidget } from './widgets/radialLauncher.ts';
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -41,9 +42,9 @@ interface GitPlugin {
 // ── Plugin API shims ─────────────────────────────────────────────────────────
 
 interface GitStatus {
-  changed: unknown[];
-  conflicted: string[];
-  staged: unknown[];
+  changed?: undefined | unknown[];
+  conflicted?: undefined | unknown[];
+  staged?: undefined | unknown[];
 }
 
 interface PomodoroTimer {
@@ -82,6 +83,11 @@ interface TimerStore {
 interface TrashApi {
   getCandidates(): TFile[];
   openTriage(): Promise<void>;
+}
+
+interface WorkspaceEvents {
+  offref(ref: EventRef): void;
+  on(name: string, callback: () => void): EventRef;
 }
 
 function headerDate(): string {
@@ -421,8 +427,8 @@ export class DashboardContent {
         const gitValueEl = el.createEl('div', { cls: 'qw-dash-pulse-value' });
         const gitSubEl = el.createEl('div', { cls: 'qw-dash-pulse-sub' });
         const applyGitStatus = (s: GitStatus | undefined): void => {
-          const changed = (s?.changed.length ?? 0) + (s?.staged.length ?? 0);
-          const conflicts = s?.conflicted.length ?? 0;
+          const changed = gitChangeCount(s);
+          const conflicts = gitConflictCount(s);
           gitValueEl.className = 'qw-dash-pulse-value';
           if (conflicts > 0) {
             gitValueEl.addClass('qw-dash-pulse-value--conflict');
@@ -437,24 +443,61 @@ export class DashboardContent {
             gitSubEl.setText('up to date');
           }
         };
-        // Show cached value immediately, then always refresh from git
+        let refreshFrame = 0;
+        let refreshInFlight = false;
+        const refreshGitStatus = (forceRefresh: boolean): void => {
+          if (!el.isConnected) { return; }
+          applyGitStatus(git.cachedStatus);
+          if (!forceRefresh || typeof git.updateCachedStatus !== 'function' || refreshInFlight) { return; }
+
+          refreshInFlight = true;
+          void git.updateCachedStatus().then((fresh) => {
+            if (el.isConnected) { applyGitStatus(fresh); }
+          }).catch((error: unknown) => {
+            console.warn('ReadyBoard: failed to refresh git pulse status', error);
+          }).finally(() => { refreshInFlight = false; });
+        };
+        const scheduleGitStatusRefresh = (forceRefresh: boolean): void => {
+          cancelAnimationFrame(refreshFrame);
+          refreshFrame = window.requestAnimationFrame(() => {
+            refreshFrame = 0;
+            refreshGitStatus(forceRefresh);
+          });
+        };
+
         applyGitStatus(ctx.gitStatus ?? git.cachedStatus);
-        if (typeof git.updateCachedStatus === 'function') {
-          void git.updateCachedStatus().then((fresh) => { if (el.isConnected) { applyGitStatus(fresh); } });
-        }
+        const forceGitRefresh = widgetCtx.surface !== 'sidebar';
+        scheduleGitStatusRefresh(forceGitRefresh);
+
+        const workspaceEvents = this.app.workspace as unknown as WorkspaceEvents;
+        const gitEventRefs = [
+          workspaceEvents.on('obsidian-git:status-changed', () => { scheduleGitStatusRefresh(false); }),
+          workspaceEvents.on('obsidian-git:refreshed', () => { scheduleGitStatusRefresh(false); }),
+          workspaceEvents.on('obsidian-git:refresh', () => { scheduleGitStatusRefresh(forceGitRefresh); }),
+          workspaceEvents.on('obsidian-git:head-change', () => { scheduleGitStatusRefresh(forceGitRefresh); })
+        ];
+        widgetCtx.onCleanup(() => {
+          cancelAnimationFrame(refreshFrame);
+          for (const ref of gitEventRefs) { workspaceEvents.offref(ref); }
+        });
+
         el.addEventListener('click', (e) => {
           if (widgetCtx.settings.gitPulseCardAction === 'menu') {
             const menu = new Menu();
             const cmds = (this.app as unknown as { commands: { commands: Record<string, { id: string; name: string }> } }).commands.commands;
             for (const cmd of Object.values(cmds)) {
               if (cmd.id.startsWith('obsidian-git:')) {
-                menu.addItem((item) => item.setTitle(cmd.name).onClick(() => { this.app.commands.executeCommandById(cmd.id); }));
+                menu.addItem((item) => item.setTitle(cmd.name).onClick(() => {
+                  this.app.commands.executeCommandById(cmd.id);
+                  scheduleGitStatusRefresh(forceGitRefresh);
+                }));
               }
             }
             menu.showAtMouseEvent(e);
           } else {
             this.close();
             this.app.commands.executeCommandById('obsidian-git:push');
+            scheduleGitStatusRefresh(forceGitRefresh);
           }
         });
         break;
@@ -504,7 +547,7 @@ export class DashboardContent {
         const action = card.quickAction;
         if (!action) { break; }
         const iconWrap = el.createEl('div', { cls: 'qw-dash-pulse-action-icon' });
-        setIcon(iconWrap, action.icon || 'zap');
+        renderQuickActionIcon(iconWrap, action);
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: action.label });
         el.addEventListener('click', () => { void this.handleQuickAction(action); });
         break;
@@ -575,7 +618,7 @@ export class DashboardContent {
       ? (getExternalPlugin<GitPlugin>(this.app, 'obsidian-git') ?? null)
       : null;
     let gitStatus = gitPlugin?.cachedStatus;
-    if (gitPlugin?.gitReady && typeof gitPlugin.updateCachedStatus === 'function') {
+    if (ctx.surface !== 'sidebar' && gitPlugin?.gitReady && typeof gitPlugin.updateCachedStatus === 'function') {
       try {
         gitStatus = await gitPlugin.updateCachedStatus();
       } catch (error) {
@@ -600,7 +643,7 @@ export class DashboardContent {
     const visibleCards = cards.filter((c) => {
       if (c.type === 'trash') { return trashCount > 0; }
       if (c.type === 'git') {
-        if (contextMode) { return (gitStatus?.conflicted.length ?? 0) > 0; }
+        if (contextMode) { return hasRelevantGitStatus(gitStatus); }
         return gitPlugin?.gitReady === true;
       }
       if (c.type === 'inbox') { return inboxCount > 0; }
@@ -822,6 +865,22 @@ function getTrashApi(app: App): null | TrashApi {
   const api = plugin?.api;
   if (!api || typeof api.getCandidates !== 'function') { return null; }
   return api;
+}
+
+function gitChangeCount(status: GitStatus | undefined): number {
+  return gitStatusCount(status?.changed) + gitStatusCount(status?.staged);
+}
+
+function gitConflictCount(status: GitStatus | undefined): number {
+  return gitStatusCount(status?.conflicted);
+}
+
+function gitStatusCount(value: undefined | unknown[]): number {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function hasRelevantGitStatus(status: GitStatus | undefined): boolean {
+  return gitConflictCount(status) > 0 || gitChangeCount(status) > 0;
 }
 
 function isContextPulseMode(ctx: DashboardWidgetContext): boolean {

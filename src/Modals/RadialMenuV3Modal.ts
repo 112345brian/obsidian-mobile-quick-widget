@@ -3,9 +3,7 @@ import type {
 } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
-import {
- Modal, setIcon
-} from 'obsidian';
+import { Modal } from 'obsidian';
 
 import type { CategorizedNeighbors } from '../breadcrumbs.ts';
 import type { DashboardWidgetRegistry } from '../DashboardWidgetApi.ts';
@@ -19,6 +17,7 @@ import { vibrate } from '../haptics.ts';
 import {
  buildBreadcrumbSlots, buildCommandSlots, buildRecentSlots, showOverflowMenu
 } from '../radialSlots.ts';
+import { renderSlotIcon } from '../renderQuickActionIcon.ts';
 import { DashboardModal } from './DashboardModal.ts';
 
 // Six ring-button positions in the 340×340 wrap coordinate space.
@@ -262,7 +261,7 @@ export class RadialMenuV3Modal extends Modal {
       if (data.title) { stack.createEl('span', { cls: 'qw-radial-bc-title', text: data.title }); }
     } else if (data?.icon) {
       const iconEl = face.createEl('span', { cls: 'qw-radial-btn-icon' });
-      if (data.iconType === 'glyph') { iconEl.setText(data.icon); } else { setIcon(iconEl, data.icon); }
+      renderSlotIcon(iconEl, data.icon, data.iconType);
     }
 
     if (data) { btn.createEl('div', { cls: 'qw-radial-btn-label', text: data.label }); }

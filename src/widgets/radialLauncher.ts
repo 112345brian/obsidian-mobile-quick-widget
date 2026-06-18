@@ -1,7 +1,5 @@
 import type { TFile } from 'obsidian';
 
-import { setIcon } from 'obsidian';
-
 import type { CategorizedNeighbors } from '../breadcrumbs.ts';
 import type {
  DashboardWidgetContext, DashboardWidgetDefinition
@@ -14,6 +12,7 @@ import { vibrate } from '../haptics.ts';
 import {
  buildBreadcrumbSlots, buildCommandSlots, buildRecentSlots, showOverflowMenu
 } from '../radialSlots.ts';
+import { renderSlotIcon } from '../renderQuickActionIcon.ts';
 
 type Slot = RadialSlotData;
 
@@ -290,7 +289,7 @@ function renderSlot(stage: HTMLElement, pos: SlotPos, data: Slot | undefined, in
     if (data.title) { face.createEl('span', { cls: 'qw-dash-radial-mini-title', text: data.title }); }
   } else if (data.icon) {
     const iconEl = face.createEl('span', { cls: 'qw-dash-radial-mini-icon' });
-    if (data.iconType === 'glyph') { iconEl.setText(data.icon); } else { setIcon(iconEl, data.icon); }
+    renderSlotIcon(iconEl, data.icon, data.iconType);
   }
 
   btn.createEl('span', { cls: 'qw-dash-radial-mini-label', text: data.label });
