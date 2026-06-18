@@ -1,10 +1,14 @@
 # Changelog
 
-## 0.3.9 — 2026-06-18
+## 0.3.10 — 2026-06-18
 
 ### Fixed
 - Git pulse cards now refresh from Obsidian Git events without recursively forcing sidebar refreshes, and contextual mode treats conflicts or local changed/staged files as relevant.
 - Quick-action glyph icons now render as literal glyphs in pulse cards, dashboard action buttons, and radial command slots instead of being sent through Lucide icon lookup.
+
+## 0.3.9 — 2026-06-18
+
+### Fixed
 - New-note creation now resolves Obsidian Unique Note settings as a fallback when ReadyBoard's own folder/template fields are blank.
 - Configured template files now run through Templater's create-new-note API when Templater is installed, so user scripts and `tp.file.*` context execute against the created note instead of copied template text.
 - Core Obsidian template placeholders such as `{{date:YYYY-MM-DDTHH:mm:ss}}`, `{{time}}`, and `{{title}}` are expanded after template insertion.
