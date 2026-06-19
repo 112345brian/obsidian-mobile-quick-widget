@@ -16,15 +16,15 @@ import { renderSlotIcon } from '../renderQuickActionIcon.ts';
 
 type Slot = RadialSlotData;
 
-interface SlotPos {
+export interface SlotPos {
   left: number;
   top: number;
 }
 
-const STAGE_SIZE = 240;
-const STAGE_CENTER = STAGE_SIZE / 2;
-const GUIDE_RADIUS = 82;
-const SLOTS: SlotPos[] = [
+export const STAGE_SIZE = 240;
+export const STAGE_CENTER = STAGE_SIZE / 2;
+export const GUIDE_RADIUS = 82;
+export const SLOTS: SlotPos[] = [
   { left: STAGE_CENTER, top: STAGE_CENTER - GUIDE_RADIUS },
   { left: STAGE_CENTER + 71, top: STAGE_CENTER - 41 },
   { left: STAGE_CENTER + 71, top: STAGE_CENTER + 41 },

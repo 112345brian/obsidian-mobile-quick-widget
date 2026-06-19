@@ -56,6 +56,7 @@ interface PulseRenderContext {
   allFiles: TFile[];
   git: GitPlugin | null;
   gitStatus: GitStatus | undefined;
+  gitStatusFresh: boolean;
   inboxCount: number;
   modifiedTodayCount: number;
   pomodoroRunningOrRecent: boolean;
@@ -311,15 +312,15 @@ export class DashboardContent {
       indicator.classList.remove('qw-overdrag--ready', 'qw-overdrag--fired');
     };
 
-    scrollEl.addEventListener('touchstart', (e: TouchEvent) => {
+    const onTouchStart = (e: TouchEvent): void => {
       if (scrollEl.scrollTop <= 0) {
         startY = e.touches[0]!.clientY;
         pulling = true;
         peaked = false;
       }
-    }, { passive: true });
+    };
 
-    scrollEl.addEventListener('touchmove', (e: TouchEvent) => {
+    const onTouchMove = (e: TouchEvent): void => {
       if (!pulling) { return; }
       if (scrollEl.scrollTop > 0) { reset(); return; }
       const delta = e.touches[0]!.clientY - startY;
@@ -343,9 +344,9 @@ export class DashboardContent {
         peaked = false;
         indicator.classList.remove('qw-overdrag--ready');
       }
-    }, { passive: false });
+    };
 
-    scrollEl.addEventListener('touchend', async () => {
+    const onTouchEnd = async (): Promise<void> => {
       if (!pulling) { return; }
       if (!peaked) { reset(); return; }
 
@@ -359,9 +360,18 @@ export class DashboardContent {
         const file = await createNote(this.app, this.settings);
         await this.app.workspace.getMostRecentLeaf()?.openFile(file);
       } catch { /* CreateNote already surfaced a Notice */ }
-    });
+    };
 
+    scrollEl.addEventListener('touchstart', onTouchStart, { passive: true });
+    scrollEl.addEventListener('touchmove', onTouchMove, { passive: false });
+    scrollEl.addEventListener('touchend', onTouchEnd);
     scrollEl.addEventListener('touchcancel', reset);
+    this.cleanupFns.push(() => {
+      scrollEl.removeEventListener('touchstart', onTouchStart);
+      scrollEl.removeEventListener('touchmove', onTouchMove);
+      scrollEl.removeEventListener('touchend', onTouchEnd);
+      scrollEl.removeEventListener('touchcancel', reset);
+    });
   }
 
   private close(): void {
@@ -466,7 +476,7 @@ export class DashboardContent {
         };
 
         applyGitStatus(ctx.gitStatus ?? git.cachedStatus);
-        const forceGitRefresh = widgetCtx.surface !== 'sidebar';
+        const forceGitRefresh = !pctx.gitStatusFresh;
         scheduleGitStatusRefresh(forceGitRefresh);
 
         const workspaceEvents = this.app.workspace as unknown as WorkspaceEvents;
@@ -600,13 +610,13 @@ export class DashboardContent {
   }
 
   private async renderTodaySection(root: HTMLElement, ctx: DashboardWidgetContext, normalizedWidgets: DashboardWidget[], cols: number): Promise<void> {
-    const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
-    dateRow.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
-
     const cards = (ctx.settings.pulseCards ?? []).filter((c) => c.enabled);
     const radialEnabled = normalizedWidgets.some((w) => w.type === 'radial' && w.enabled);
 
     if (cards.length === 0 && !radialEnabled) { return; }
+
+    const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
+    dateRow.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
 
     // Pre-compute shared data
     const needsTrash = cards.some((c) => c.type === 'trash');
@@ -618,9 +628,11 @@ export class DashboardContent {
       ? (getExternalPlugin<GitPlugin>(this.app, 'obsidian-git') ?? null)
       : null;
     let gitStatus = gitPlugin?.cachedStatus;
+    let gitStatusFresh = false;
     if (ctx.surface !== 'sidebar' && gitPlugin?.gitReady && typeof gitPlugin.updateCachedStatus === 'function') {
       try {
         gitStatus = await gitPlugin.updateCachedStatus();
+        gitStatusFresh = true;
       } catch (error) {
         console.warn('ReadyBoard: failed to refresh git pulse status', error);
       }
@@ -651,8 +663,8 @@ export class DashboardContent {
       if (c.type === 'references') { return activeReferences.citekeys.length > 0; }
       if (!contextMode) { return true; }
       if (c.type === 'modified-today') { return modifiedTodayCount > 0; }
-      return true;
-    }).filter((c) => !contextMode || c.type === 'trash' || c.type === 'git' || c.type === 'inbox' || c.type === 'pomodoro' || c.type === 'references' || c.type === 'modified-today');
+      return false;
+    });
 
     if (visibleCards.length === 0 && !radialEnabled) { return; }
 
@@ -664,6 +676,7 @@ export class DashboardContent {
       allFiles,
       git: gitPlugin,
       gitStatus,
+      gitStatusFresh,
       inboxCount,
       modifiedTodayCount,
       pomodoroRunningOrRecent,

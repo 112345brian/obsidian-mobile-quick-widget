@@ -1,5 +1,5 @@
 import {
- Modal, setIcon, Setting
+ Modal, Setting
 } from 'obsidian';
 
 import type { Plugin } from './Plugin.ts';
@@ -8,6 +8,10 @@ import type {
 } from './PluginSettings.ts';
 
 import { CommandPickerModal } from './Modals/CommandPickerModal.ts';
+import { renderSlotIcon } from './renderQuickActionIcon.ts';
+import {
+  GUIDE_RADIUS, SLOTS, STAGE_CENTER, STAGE_SIZE
+} from './widgets/radialLauncher.ts';
 import {
  FileSuggest, FolderSuggest, renderChipList
 } from './PathSuggest.ts';
@@ -606,17 +610,6 @@ export class ReadyBoardSettingsModal extends Modal {
   // ── Radial ────────────────────────────────────────────────────────────────
 
   private renderRadialPreview(el: HTMLElement, commands: QuickAction[]): void {
-    const STAGE_SIZE = 240;
-    const STAGE_CENTER = STAGE_SIZE / 2;
-    const GUIDE_RADIUS = 82;
-    const SLOTS = [
-      { left: STAGE_CENTER, top: STAGE_CENTER - GUIDE_RADIUS },
-      { left: STAGE_CENTER + 71, top: STAGE_CENTER - 41 },
-      { left: STAGE_CENTER + 71, top: STAGE_CENTER + 41 },
-      { left: STAGE_CENTER, top: STAGE_CENTER + GUIDE_RADIUS },
-      { left: STAGE_CENTER - 71, top: STAGE_CENTER + 41 },
-      { left: STAGE_CENTER - 71, top: STAGE_CENTER - 41 }
-    ];
 
     const wrap = el.createDiv('qw-settings-radial-preview');
     const stage = wrap.createEl('div', { cls: 'qw-dash-radial-stage' });
@@ -660,7 +653,7 @@ export class ReadyBoardSettingsModal extends Modal {
           face.createEl('span', { cls: 'qw-dash-radial-mini-arrow', text: cmd.icon });
         } else {
           const iconEl = face.createEl('span', { cls: 'qw-dash-radial-mini-icon' });
-          setIcon(iconEl, cmd.icon || 'zap');
+          renderSlotIcon(iconEl, cmd.icon || 'zap', cmd.iconType);
         }
         face.createEl('span', { cls: 'qw-dash-radial-mini-title', text: (cmd.label ?? '').slice(0, 7) });
       }
