@@ -1,9 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.3.11 — 2026-06-18
 
-### Added
-- Added CI and release guardrails for lint/build validation, exact-tag release checks, local hot-reload installation, and a dashboard/radial smoke checklist.
+### Fixed
+- Sidebar git pulse card now force-refreshes after Obsidian Git sync/push/commit events so the count updates immediately instead of waiting for the next poll cycle.
+- Eliminated an event feedback loop where `obsidian-git:refresh` and `obsidian-git:head-change` were triggering recursive `updateCachedStatus()` calls from the sidebar, causing the Obsidian Git status bar icon to spin continuously.
+- Release workflow tag glob corrected (`[0-9]*` instead of `[0-9]+`) so the workflow now actually fires on semver tags; lint and build run before the release check to prevent stranding a public tag on a broken build.
+- Radial launcher geometry constants and `renderSlotIcon` are now shared with the settings preview, eliminating a source of drift between the preview and the live radial.
+- Date header in dashboard "TODAY" section no longer renders when all contextual cards are hidden.
+- Overdrag touch listeners are now properly cleaned up on re-render to prevent listener accumulation.
 
 ## 0.3.10 — 2026-06-18
 
