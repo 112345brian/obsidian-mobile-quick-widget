@@ -476,15 +476,14 @@ export class DashboardContent {
         };
 
         applyGitStatus(ctx.gitStatus ?? git.cachedStatus);
-        const forceGitRefresh = !pctx.gitStatusFresh;
-        scheduleGitStatusRefresh(forceGitRefresh);
+        scheduleGitStatusRefresh(!pctx.gitStatusFresh);
 
         const workspaceEvents = this.app.workspace as unknown as WorkspaceEvents;
         const gitEventRefs = [
           workspaceEvents.on('obsidian-git:status-changed', () => { scheduleGitStatusRefresh(false); }),
           workspaceEvents.on('obsidian-git:refreshed', () => { scheduleGitStatusRefresh(false); }),
-          workspaceEvents.on('obsidian-git:refresh', () => { scheduleGitStatusRefresh(forceGitRefresh); }),
-          workspaceEvents.on('obsidian-git:head-change', () => { scheduleGitStatusRefresh(forceGitRefresh); })
+          workspaceEvents.on('obsidian-git:refresh', () => { scheduleGitStatusRefresh(false); }),
+          workspaceEvents.on('obsidian-git:head-change', () => { scheduleGitStatusRefresh(false); })
         ];
         widgetCtx.onCleanup(() => {
           cancelAnimationFrame(refreshFrame);
@@ -499,7 +498,7 @@ export class DashboardContent {
               if (cmd.id.startsWith('obsidian-git:')) {
                 menu.addItem((item) => item.setTitle(cmd.name).onClick(() => {
                   this.app.commands.executeCommandById(cmd.id);
-                  scheduleGitStatusRefresh(forceGitRefresh);
+                  scheduleGitStatusRefresh(true);
                 }));
               }
             }
@@ -507,7 +506,7 @@ export class DashboardContent {
           } else {
             this.close();
             this.app.commands.executeCommandById('obsidian-git:push');
-            scheduleGitStatusRefresh(forceGitRefresh);
+            scheduleGitStatusRefresh(true);
           }
         });
         break;
