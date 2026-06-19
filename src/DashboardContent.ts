@@ -317,7 +317,8 @@ export class DashboardContent {
 
     // Make the host focusable so keydown fires without clicking first
     if (!host.hasAttribute('tabindex')) host.setAttribute('tabindex', '-1');
-    this.focusHost();
+    // Sidebar focus is managed by revealDashboardSidebar; skip here so refresh() doesn't steal focus.
+    if (!this.isSidebar) this.focusHost();
   }
 
   private attachOverdrag(scrollEl: HTMLElement, indicator: HTMLElement): void {
