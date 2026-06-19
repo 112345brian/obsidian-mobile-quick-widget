@@ -60,7 +60,7 @@ export class PluginSettingsManager extends PluginSettingsManagerBase<PluginTypes
         [k: string]: unknown;
         public [oldKey] = undefined;
       }
-      this.registerLegacySettingsConverter(LegacySettings, () => {/* No-op: pure removal */});
+      this.registerLegacySettingsConverter(LegacySettings, () => {});
     }
 
     for (const [oldKey, desktopKey, mobileKey] of LEGACY_PULSE_DISPLAY_MODES) {
