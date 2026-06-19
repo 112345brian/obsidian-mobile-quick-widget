@@ -138,7 +138,7 @@ export class DashboardWidgetRegistry {
   public register(definition: DashboardWidgetDefinition): () => void {
     this.widgets.set(definition.id, definition);
     return () => {
-      if (this.widgets.get(definition.id) === definition) { this.widgets.delete(definition.id); }
+      if (this.widgets.get(definition.id) === definition) this.widgets.delete(definition.id);
     };
   }
 }

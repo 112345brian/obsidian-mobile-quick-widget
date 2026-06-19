@@ -112,7 +112,7 @@ export function renderChipList(
   // Without re-scanning the vault (which would cause false positives for
   // Manually typed paths that happen to match a vault entry).
   input.addEventListener('input', () => {
-    if (!suggest.justSelected) { return; }
+    if (!suggest.justSelected) return;
     suggest.justSelected = false;
     const val = input.value.trim();
     if (val && !getValues().includes(val)) {
@@ -124,7 +124,7 @@ export function renderChipList(
 
   function addValue(): void {
     const val = input.value.trim();
-    if (!val) { return; }
+    if (!val) return;
     if (!getValues().includes(val)) {
       setValues([...getValues(), val]);
       redrawChips();
@@ -145,7 +145,7 @@ export function renderChipList(
 function allFolders(app: App): TFolder[] {
   const folders: TFolder[] = [];
   app.vault.getAllLoadedFiles().forEach((f: TAbstractFile) => {
-    if (f instanceof TFolder && f.path !== '/') { folders.push(f); }
+    if (f instanceof TFolder && f.path !== '/') folders.push(f);
   });
   return folders;
 }

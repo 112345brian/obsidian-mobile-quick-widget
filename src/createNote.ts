@@ -146,7 +146,7 @@ async function createNoteFromTemplater(
 ): Promise<TFile> {
   try {
     const file = await templater.create_new_note_from_template?.(templateFile, folder || undefined, baseName, false);
-    if (file) { return file; }
+    if (file) return file;
     throw new Error('Templater did not return the created note.');
   } catch (err) {
     console.error('ReadyBoard: Templater failed to create note from template', err);
@@ -158,7 +158,7 @@ async function createNoteFromTemplater(
 async function expandCoreTemplateTokens(app: App, file: TFile): Promise<void> {
   const content = await app.vault.read(file);
   const expanded = replaceCoreTemplateTokens(content, file, new Date());
-  if (expanded !== content) { await app.vault.modify(file, expanded); }
+  if (expanded !== content) await app.vault.modify(file, expanded);
 }
 
 function getTemplateFile(app: App, path: string, templaterFolder?: string): null | TFile {
@@ -172,7 +172,7 @@ function getTemplateFile(app: App, path: string, templaterFolder?: string): null
 
   for (const candidate of paths) {
     const file = app.vault.getFileByPath(candidate);
-    if (file) { return file; }
+    if (file) return file;
   }
 
   return app.metadataCache.getFirstLinkpathDest(trimmed, '');
@@ -198,12 +198,12 @@ async function readUniqueNoteOptions(app: App): Promise<null | UniqueNoteOptions
   try {
     const raw = await app.vault.adapter.read(`${app.vault.configDir}/zk-prefixer.json`);
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') { return null; }
+    if (!parsed || typeof parsed !== 'object') return null;
     const record = parsed as Record<string, unknown>;
     const options: UniqueNoteOptions = {};
-    if (typeof record['folder'] === 'string') { options.folder = record['folder']; }
-    if (typeof record['format'] === 'string') { options.format = record['format']; }
-    if (typeof record['template'] === 'string') { options.template = record['template']; }
+    if (typeof record['folder'] === 'string') options.folder = record['folder'];
+    if (typeof record['format'] === 'string') options.format = record['format'];
+    if (typeof record['template'] === 'string') options.template = record['template'];
     return options;
   } catch {
     return null;
@@ -256,7 +256,7 @@ async function resolveNewNoteOptions(
 }
 
 async function runTemplaterOnExistingNote(templater: null | TemplaterRuntime, file: TFile): Promise<void> {
-  if (!templater?.overwrite_file_commands) { return; }
+  if (!templater?.overwrite_file_commands) return;
   try {
     await templater.overwrite_file_commands(file, false);
   } catch (err) {

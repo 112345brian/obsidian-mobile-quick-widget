@@ -9,7 +9,7 @@ export class PluginSettingsTab extends PluginSettingsTabBase<PluginTypes> {
 
   public override display(): void {
     this.containerEl.addClass('qw-settings-modal');
-    if (!this.settingsModal) { this.settingsModal = new ReadyBoardSettingsModal(this.plugin); }
+    if (!this.settingsModal) this.settingsModal = new ReadyBoardSettingsModal(this.plugin);
     this.settingsModal.renderInto(this.containerEl);
   }
 }

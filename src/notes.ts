@@ -28,11 +28,11 @@ export function getModifiedTime(app: App, settings: ReadonlyDeep<PluginSettings>
   const field = settings.modifiedDateField;
   if (field) {
     const val = app.metadataCache.getFileCache(file)?.frontmatter?.[field] as unknown;
-    if (val instanceof Date) { return val.getTime(); }
-    if (typeof val === 'number' && val > 1e11) { return val; } // Looks like a ms epoch timestamp
+    if (val instanceof Date) return val.getTime();
+    if (typeof val === 'number' && val > 1e11) return val; // Looks like a ms epoch timestamp
     if (typeof val === 'string') {
       const t = Date.parse(val);
-      if (!isNaN(t)) { return t; }
+      if (!isNaN(t)) return t;
     }
   }
   return file.stat.mtime;
@@ -52,7 +52,7 @@ export function getParentNames(app: App, settings: ReadonlyDeep<PluginSettings>,
           const path = e.target_id.endsWith('.md') ? e.target_id : `${e.target_id}.md`;
           return app.vault.getFileByPath(path)?.basename ?? app.vault.getFileByPath(e.target_id)?.basename ?? e.target_id.split('/').pop() ?? e.target_id;
         });
-      if (names.length > 0) { return names; }
+      if (names.length > 0) return names;
     } catch { /* Fall through */ }
   }
   const field = settings.breadcrumbField || 'up';

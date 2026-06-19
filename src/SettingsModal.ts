@@ -82,7 +82,7 @@ export class ReadyBoardSettingsModal extends Modal {
     const tabBar = container.createDiv('qw-settings-tab-bar');
     for (const { id, label } of TABS) {
       const btn = tabBar.createEl('button', { cls: 'qw-settings-tab-btn', text: label });
-      if (id === this.activeTab) { btn.addClass('is-active'); }
+      if (id === this.activeTab) btn.addClass('is-active');
       btn.onclick = () => {
         this.switchTab(id);
       };
@@ -95,7 +95,7 @@ export class ReadyBoardSettingsModal extends Modal {
 
   private clonePulseCard(card: PulseCard): PulseCard {
     const clone: PulseCard = { ...card };
-    if (card.quickAction) { clone.quickAction = { ...card.quickAction }; }
+    if (card.quickAction) clone.quickAction = { ...card.quickAction };
     return clone;
   }
 
@@ -187,7 +187,7 @@ export class ReadyBoardSettingsModal extends Modal {
           t.setPlaceholder('15').setValue(String(s.recentListCount ?? 15))
             .onChange((v) => {
               const n = parseInt(v, 10);
-              if (!isNaN(n) && n > 0) { s.recentListCount = n; }
+              if (!isNaN(n) && n > 0) s.recentListCount = n;
             });
           this.saveTextOnCommit(t.inputEl, save);
         });
@@ -196,7 +196,7 @@ export class ReadyBoardSettingsModal extends Modal {
           t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
             .onChange((v) => {
               const n = parseInt(v, 10);
-              if (!isNaN(n) && n > 0) { s.modifiedListCount = n; }
+              if (!isNaN(n) && n > 0) s.modifiedListCount = n;
             });
           this.saveTextOnCommit(t.inputEl, save);
         });
@@ -210,7 +210,7 @@ export class ReadyBoardSettingsModal extends Modal {
           t.setPlaceholder('15').setValue(String(s.sidebarRecentListCount ?? 15))
             .onChange((v) => {
               const n = parseInt(v, 10);
-              if (!isNaN(n) && n > 0) { s.sidebarRecentListCount = n; }
+              if (!isNaN(n) && n > 0) s.sidebarRecentListCount = n;
             });
           this.saveTextOnCommit(t.inputEl, save);
         });
@@ -219,7 +219,7 @@ export class ReadyBoardSettingsModal extends Modal {
           t.setPlaceholder('15').setValue(String(s.sidebarModifiedListCount ?? 15))
             .onChange((v) => {
               const n = parseInt(v, 10);
-              if (!isNaN(n) && n > 0) { s.sidebarModifiedListCount = n; }
+              if (!isNaN(n) && n > 0) s.sidebarModifiedListCount = n;
             });
           this.saveTextOnCommit(t.inputEl, save);
         });
@@ -232,7 +232,7 @@ export class ReadyBoardSettingsModal extends Modal {
           t.setPlaceholder('15').setValue(String(s.recentListCount ?? 15))
             .onChange((v) => {
               const n = parseInt(v, 10);
-              if (!isNaN(n) && n > 0) { s.recentListCount = n; }
+              if (!isNaN(n) && n > 0) s.recentListCount = n;
             });
           this.saveTextOnCommit(t.inputEl, save);
         });
@@ -241,7 +241,7 @@ export class ReadyBoardSettingsModal extends Modal {
           t.setPlaceholder('15').setValue(String(s.modifiedListCount ?? 15))
             .onChange((v) => {
               const n = parseInt(v, 10);
-              if (!isNaN(n) && n > 0) { s.modifiedListCount = n; }
+              if (!isNaN(n) && n > 0) s.modifiedListCount = n;
             });
           this.saveTextOnCommit(t.inputEl, save);
         });
@@ -262,7 +262,8 @@ export class ReadyBoardSettingsModal extends Modal {
         d.addOption('breadcrumbs', 'Breadcrumbs').addOption('commands', 'Commands').addOption('recents', 'Recents')
           .setValue(isSidebar ? s.sidebarDashboardRadialMode : s.dashboardRadialMode)
           .onChange((v) => {
-            if (isSidebar) { s.sidebarDashboardRadialMode = v as RadialMode; } else { s.dashboardRadialMode = v as RadialMode; }
+            if (isSidebar) s.sidebarDashboardRadialMode = v as RadialMode;
+            else s.dashboardRadialMode = v as RadialMode;
             save();
           })
       );
@@ -272,7 +273,8 @@ export class ReadyBoardSettingsModal extends Modal {
         d.addOption('press-hold', 'Press & hold').addOption('tap-toggle', 'Tap to toggle')
           .setValue(isSidebar ? s.sidebarDashboardRadialInteraction : s.dashboardRadialInteraction)
           .onChange((v) => {
-            if (isSidebar) { s.sidebarDashboardRadialInteraction = v as DashboardRadialInteraction; } else { s.dashboardRadialInteraction = v as DashboardRadialInteraction; }
+            if (isSidebar) s.sidebarDashboardRadialInteraction = v as DashboardRadialInteraction;
+            else s.dashboardRadialInteraction = v as DashboardRadialInteraction;
             save();
           })
       );
@@ -333,7 +335,7 @@ export class ReadyBoardSettingsModal extends Modal {
           .setValue(s.newNoteFilenameFormat)
           .onChange((v) => {
             s.newNoteFilenameFormat = v as NewNoteFilenameFormat;
-            if (customEl) { customEl.style.display = v === 'custom' ? '' : 'none'; }
+            if (customEl) customEl.style.display = v === 'custom' ? '' : 'none';
             save();
           })
       );
@@ -378,7 +380,8 @@ export class ReadyBoardSettingsModal extends Modal {
       t
         .setValue(isSidebar ? s.sidebarCardShowTags : s.cardShowTags)
         .onChange((v) => {
-          if (isSidebar) { s.sidebarCardShowTags = v; } else { s.cardShowTags = v; }
+          if (isSidebar) s.sidebarCardShowTags = v;
+          else s.cardShowTags = v;
           save();
         })
     );
@@ -386,7 +389,8 @@ export class ReadyBoardSettingsModal extends Modal {
       t
         .setValue(isSidebar ? s.sidebarCardShowBacklinks : s.cardShowBacklinks)
         .onChange((v) => {
-          if (isSidebar) { s.sidebarCardShowBacklinks = v; } else { s.cardShowBacklinks = v; }
+          if (isSidebar) s.sidebarCardShowBacklinks = v;
+          else s.cardShowBacklinks = v;
           save();
         })
     );
@@ -395,7 +399,8 @@ export class ReadyBoardSettingsModal extends Modal {
         t
           .setValue(isSidebar ? s.sidebarCardShowPreview : s.cardShowPreview)
           .onChange((v) => {
-            if (isSidebar) { s.sidebarCardShowPreview = v; } else { s.cardShowPreview = v; }
+            if (isSidebar) s.sidebarCardShowPreview = v;
+            else s.cardShowPreview = v;
             save();
           })
       );
@@ -404,7 +409,8 @@ export class ReadyBoardSettingsModal extends Modal {
         t
           .setValue(isSidebar ? s.sidebarShowBreadcrumbs : s.showBreadcrumbs)
           .onChange((v) => {
-            if (isSidebar) { s.sidebarShowBreadcrumbs = v; } else { s.showBreadcrumbs = v; }
+            if (isSidebar) s.sidebarShowBreadcrumbs = v;
+            else s.showBreadcrumbs = v;
             save();
           })
       );
@@ -413,7 +419,8 @@ export class ReadyBoardSettingsModal extends Modal {
         t.setPlaceholder('up')
           .setValue(isSidebar ? s.sidebarBreadcrumbField : s.breadcrumbField)
           .onChange((v) => {
-            if (isSidebar) { s.sidebarBreadcrumbField = v.trim(); } else { s.breadcrumbField = v.trim(); }
+            if (isSidebar) s.sidebarBreadcrumbField = v.trim();
+            else s.breadcrumbField = v.trim();
           });
         this.saveTextOnCommit(t.inputEl, save);
       });
@@ -423,7 +430,8 @@ export class ReadyBoardSettingsModal extends Modal {
           .setValue((isSidebar ? s.sidebarCardFrontmatterFields : s.cardFrontmatterFields).join('\n'))
           .onChange((v) => {
             const fields = v.split('\n').map((f) => f.trim()).filter(Boolean);
-            if (isSidebar) { s.sidebarCardFrontmatterFields = fields; } else { s.cardFrontmatterFields = fields; }
+            if (isSidebar) s.sidebarCardFrontmatterFields = fields;
+            else s.cardFrontmatterFields = fields;
           });
         this.saveTextOnCommit(t.inputEl, save, true);
       });
@@ -484,7 +492,7 @@ export class ReadyBoardSettingsModal extends Modal {
 
   private renderPulseCardBlock(el: HTMLElement, cards: PulseCard[], i: number, save: () => void): void {
     const card = cards[i];
-    if (!card) { return; }
+    if (!card) return;
     const label = card.type === 'quick-action' && card.quickAction ? card.quickAction.label : PULSE_CARD_LABELS[card.type];
 
     const block = el.createDiv('qw-settings-pulse-block');
@@ -492,7 +500,7 @@ export class ReadyBoardSettingsModal extends Modal {
     // Row 1: toggle + name
     const row1 = block.createDiv('qw-settings-pulse-row1');
     const toggle = row1.createEl('div', { cls: 'checkbox-container' });
-    if (card.enabled) { toggle.addClass('is-enabled'); }
+    if (card.enabled) toggle.addClass('is-enabled');
     toggle.onclick = () => {
       card.enabled = !card.enabled;
       toggle.toggleClass('is-enabled', card.enabled);
@@ -505,7 +513,7 @@ export class ReadyBoardSettingsModal extends Modal {
     const spanSel = row2.createEl('select', { cls: 'dropdown qw-settings-pulse-span' });
     for (const [v, t] of [['1', '1 col'], ['2', '2 col'], ['3', '3 col']] as const) {
       const opt = spanSel.createEl('option', { text: t, value: v });
-      if (String(card.size ?? 1) === v) { opt.selected = true; }
+      if (String(card.size ?? 1) === v) opt.selected = true;
     }
     spanSel.onchange = () => {
       card.size = Number(spanSel.value) as 1 | 2 | 3;
@@ -515,7 +523,7 @@ export class ReadyBoardSettingsModal extends Modal {
     const upBtn = row2.createEl('button', { attr: { 'aria-label': 'Move up' }, cls: 'clickable-icon' });
     upBtn.innerHTML = '↑';
     upBtn.onclick = () => {
-      if (i === 0) { return; }
+      if (i === 0) return;
       [cards[i - 1], cards[i]] = [cards[i]!, cards[i - 1]!];
       save();
       this.redraw();
@@ -524,7 +532,7 @@ export class ReadyBoardSettingsModal extends Modal {
     const downBtn = row2.createEl('button', { attr: { 'aria-label': 'Move down' }, cls: 'clickable-icon' });
     downBtn.innerHTML = '↓';
     downBtn.onclick = () => {
-      if (i === cards.length - 1) { return; }
+      if (i === cards.length - 1) return;
       [cards[i + 1], cards[i]] = [cards[i]!, cards[i + 1]!];
       save();
       this.redraw();
@@ -546,7 +554,7 @@ export class ReadyBoardSettingsModal extends Modal {
   ): void {
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i];
-      if (!card) { continue; }
+      if (!card) continue;
       this.renderPulseCardBlock(el, cards, i, save);
     }
 
@@ -593,7 +601,8 @@ export class ReadyBoardSettingsModal extends Modal {
           .addOption('contextual', 'Contextual')
           .setValue(isSidebar ? s.sidebarPulseCardDesktopDisplayMode : s.pulseCardDesktopDisplayMode)
           .onChange((v) => {
-            if (isSidebar) { s.sidebarPulseCardDesktopDisplayMode = v as PulseCardDisplayMode; } else { s.pulseCardDesktopDisplayMode = v as PulseCardDisplayMode; }
+            if (isSidebar) s.sidebarPulseCardDesktopDisplayMode = v as PulseCardDisplayMode;
+            else s.pulseCardDesktopDisplayMode = v as PulseCardDisplayMode;
             save();
           })
       );
@@ -607,7 +616,8 @@ export class ReadyBoardSettingsModal extends Modal {
           .addOption('contextual', 'Contextual')
           .setValue(isSidebar ? s.sidebarPulseCardMobileDisplayMode : s.pulseCardMobileDisplayMode)
           .onChange((v) => {
-            if (isSidebar) { s.sidebarPulseCardMobileDisplayMode = v as PulseCardDisplayMode; } else { s.pulseCardMobileDisplayMode = v as PulseCardDisplayMode; }
+            if (isSidebar) s.sidebarPulseCardMobileDisplayMode = v as PulseCardDisplayMode;
+            else s.pulseCardMobileDisplayMode = v as PulseCardDisplayMode;
             save();
           })
       );
@@ -621,7 +631,7 @@ export class ReadyBoardSettingsModal extends Modal {
     opts: { removable: boolean }
   ): void {
     const action = actions[i];
-    if (!action) { return; }
+    if (!action) return;
 
     new Setting(el).setName('Label')
       .addText((t) => {
@@ -864,7 +874,8 @@ export class ReadyBoardSettingsModal extends Modal {
             preset.widgets.map((w) => ({ enabled: w.enabled, type: w.type })),
             knownIds
           );
-          if (isSidebar) { s.sidebarWidgets = normalized; } else { s.dashboardWidgets = normalized; }
+          if (isSidebar) s.sidebarWidgets = normalized;
+          else s.dashboardWidgets = normalized;
           save();
           this.redraw();
         })
@@ -873,11 +884,12 @@ export class ReadyBoardSettingsModal extends Modal {
 
     const raw = isSidebar ? (s.sidebarWidgets) : (s.dashboardWidgets);
     const widgets = normalizeDashboardWidgets(raw, knownIds);
-    if (isSidebar) { s.sidebarWidgets = widgets; } else { s.dashboardWidgets = widgets; }
+    if (isSidebar) s.sidebarWidgets = widgets;
+    else s.dashboardWidgets = widgets;
 
     for (let i = 0; i < widgets.length; i++) {
       const widget = widgets[i];
-      if (!widget) { continue; }
+      if (!widget) continue;
       const label = this.plugin.dashboardWidgetRegistry.get(widget.type)?.label ?? widget.type;
       new Setting(el).setName(label)
         .addToggle((t) =>
@@ -888,7 +900,7 @@ export class ReadyBoardSettingsModal extends Modal {
         )
         .addExtraButton((btn) =>
           btn.setIcon('arrow-up').setTooltip('Move up').onClick(() => {
-            if (i === 0) { return; }
+            if (i === 0) return;
             const prev = widgets[i - 1];
             const curr = widgets[i];
             if (prev && curr) {
@@ -901,7 +913,7 @@ export class ReadyBoardSettingsModal extends Modal {
         )
         .addExtraButton((btn) =>
           btn.setIcon('arrow-down').setTooltip('Move down').onClick(() => {
-            if (i === widgets.length - 1) { return; }
+            if (i === widgets.length - 1) return;
             const next = widgets[i + 1];
             const curr = widgets[i];
             if (next && curr) {
@@ -920,15 +932,15 @@ export class ReadyBoardSettingsModal extends Modal {
   private saveTextOnCommit(inputEl: HTMLInputElement | HTMLTextAreaElement, save: () => void, multiline = false): void {
     let savedValue = inputEl.value;
     const commit = (): void => {
-      if (inputEl.value === savedValue) { return; }
+      if (inputEl.value === savedValue) return;
       savedValue = inputEl.value;
       save();
     };
     const onKeyDown = (event: Event): void => {
-      if (!(event instanceof KeyboardEvent)) { return; }
-      if (event.key !== 'Enter') { return; }
-      if (multiline && !event.metaKey && !event.ctrlKey) { return; }
-      if (!multiline) { event.preventDefault(); }
+      if (!(event instanceof KeyboardEvent)) return;
+      if (event.key !== 'Enter') return;
+      if (multiline && !event.metaKey && !event.ctrlKey) return;
+      if (!multiline) event.preventDefault();
       commit();
     };
 

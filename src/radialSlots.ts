@@ -53,7 +53,7 @@ export function buildBreadcrumbSlots(
   openFile: (file: TFile) => void,
   onOverflow: (overflowChildren: TFile[], event: MouseEvent) => void
 ): (RadialSlotData | undefined)[] {
-  if (!nb) { return new Array<RadialSlotData | undefined>(SLOT_COUNT).fill(undefined); }
+  if (!nb) return new Array<RadialSlotData | undefined>(SLOT_COUNT).fill(undefined);
 
   // Right flank prefers the explicit "next" sequence note, left prefers "prev".
   // Remaining sibling slots are filled from a shared queue so none is dropped

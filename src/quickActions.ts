@@ -52,7 +52,7 @@ export async function executeQuickAction(
     }
     case 'command': {
       close();
-      if (!action.commandId) { break; }
+      if (!action.commandId) break;
       if (app.commands.findCommand(action.commandId)) {
         app.commands.executeCommandById(action.commandId);
       } else {
