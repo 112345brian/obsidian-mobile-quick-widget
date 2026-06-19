@@ -19,6 +19,7 @@ function getRepoSourceOverrides(context: EslintConfigContext): Linter.Config[] {
         '@typescript-eslint/prefer-nullish-coalescing': 'off',
         '@typescript-eslint/restrict-template-expressions': 'off',
         'complexity': 'off',
+        'curly': ['error', 'multi-line'],
         'default-case': 'off',
         'func-style': 'off',
         'no-lonely-if': 'off',

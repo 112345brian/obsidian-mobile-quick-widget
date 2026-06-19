@@ -72,9 +72,9 @@ export class PluginSettingsManager extends PluginSettingsManagerBase<PluginTypes
         LegacySettings,
         (legacy: Record<string, unknown>) => {
           const modes = normalizeLegacyPulseDisplayMode(legacy[oldKey]);
-          if (!modes) { return; }
-          if (!(desktopKey in legacy)) { legacy[desktopKey] = modes.desktop; }
-          if (!(mobileKey in legacy)) { legacy[mobileKey] = modes.mobile; }
+          if (!modes) return;
+          if (!(desktopKey in legacy)) legacy[desktopKey] = modes.desktop;
+          if (!(mobileKey in legacy)) legacy[mobileKey] = modes.mobile;
         }
       );
     }
@@ -82,8 +82,8 @@ export class PluginSettingsManager extends PluginSettingsManagerBase<PluginTypes
 }
 
 function normalizeLegacyPulseDisplayMode(value: unknown): { desktop: 'always' | 'contextual'; mobile: 'always' | 'contextual' } | null {
-  if (value === 'always') { return { desktop: 'always', mobile: 'always' }; }
-  if (value === 'contextual') { return { desktop: 'contextual', mobile: 'contextual' }; }
-  if (value === 'contextual-desktop') { return { desktop: 'contextual', mobile: 'always' }; }
+  if (value === 'always') return { desktop: 'always', mobile: 'always' };
+  if (value === 'contextual') return { desktop: 'contextual', mobile: 'contextual' };
+  if (value === 'contextual-desktop') return { desktop: 'contextual', mobile: 'always' };
   return null;
 }
