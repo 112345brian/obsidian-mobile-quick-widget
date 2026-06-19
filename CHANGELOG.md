@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.12 — 2026-06-19
+
+### Fixed
+- Sidebar dashboard no longer steals keyboard focus after creating a new note via the pull-to-create gesture; the editor cursor now stays in the new note as expected.
+
 ## 0.3.11 — 2026-06-18
 
 ### Fixed
