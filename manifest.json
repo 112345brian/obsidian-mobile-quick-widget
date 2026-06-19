@@ -2,10 +2,9 @@
   "author": "112345brian",
   "authorUrl": "https://github.com/112345brian/",
   "description": "Mobile radial menu and dashboard for Obsidian — navigate breadcrumbs, run commands, and jump to recent notes with one thumb.",
-
   "id": "readyboard",
   "isDesktopOnly": false,
-  "minAppVersion": "1.13.0",
+  "minAppVersion": "1.12.7",
   "name": "ReadyBoard",
-  "version": "0.3.10"
+  "version": "0.3.11"
 }
