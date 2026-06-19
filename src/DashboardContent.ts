@@ -476,7 +476,7 @@ export class DashboardContent {
         };
 
         applyGitStatus(ctx.gitStatus ?? git.cachedStatus);
-        scheduleGitStatusRefresh(!pctx.gitStatusFresh);
+        scheduleGitStatusRefresh(false);
 
         const workspaceEvents = this.app.workspace as unknown as WorkspaceEvents;
         const gitEventRefs = [
