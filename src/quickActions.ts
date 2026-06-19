@@ -4,7 +4,8 @@ import type { ReadonlyDeep } from 'type-fest';
 import { Notice } from 'obsidian';
 
 import type {
- PluginSettings, QuickAction
+  PluginSettings,
+  QuickAction
 } from './PluginSettings.ts';
 
 import { createNote } from './createNote.ts';
@@ -24,12 +25,18 @@ export async function executeQuickAction(
   switch (action.action) {
     case 'append-to-note': {
       const notePath = action.notePath;
-      if (!notePath) { new Notice('No note path configured for this action.'); return; }
+      if (!notePath) {
+        new Notice('No note path configured for this action.');
+        return;
+      }
       close();
       const template = action.appendTemplate || '{{text}}';
       new AppendPromptModal(app, action.label, async (text) => {
         const file = app.vault.getFileByPath(notePath);
-        if (!file) { new Notice(`Note not found: ${notePath}`); return; }
+        if (!file) {
+          new Notice(`Note not found: ${notePath}`);
+          return;
+        }
         try {
           const line = template.replace('{{text}}', text);
           const content = await app.vault.read(file);
@@ -45,7 +52,7 @@ export async function executeQuickAction(
     }
     case 'command': {
       close();
-      if (!action.commandId) { break; }
+      if (!action.commandId) break;
       if (app.commands.findCommand(action.commandId)) {
         app.commands.executeCommandById(action.commandId);
       } else {
@@ -58,7 +65,10 @@ export async function executeQuickAction(
       const target = settings.homePath;
       if (target) {
         const file = app.vault.getFileByPath(target) ?? app.metadataCache.getFirstLinkpathDest(target, '');
-        if (file) { await app.workspace.getMostRecentLeaf()?.openFile(file); return; }
+        if (file) {
+          await app.workspace.getMostRecentLeaf()?.openFile(file);
+          return;
+        }
       }
       try {
         if (app.commands.findCommand('homepage:open')) {
@@ -66,7 +76,9 @@ export async function executeQuickAction(
         } else {
           new Notice('No home note configured.');
         }
-      } catch { new Notice('No home note configured.'); }
+      } catch {
+        new Notice('No home note configured.');
+      }
       break;
     }
     case 'new-note': {

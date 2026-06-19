@@ -37,13 +37,16 @@ export class PluginSettingsManager extends PluginSettingsManagerBase<PluginTypes
       // The legacy class must declare oldKey as an own property — the base class
       // Uses Object.keys(new legacySettingsClass()) to decide which stale keys
       // To delete from the saved record after the converter runs.
-      class LegacySettings { [k: string]: unknown; public [oldKey] = undefined; }
+      class LegacySettings {
+        [k: string]: unknown;
+        public [oldKey] = undefined;
+      }
 
       this.registerLegacySettingsConverter(
         LegacySettings,
         (legacy: Record<string, unknown>) => {
           if (oldKey in legacy && !(newKey in legacy)) {
-            (legacy)[newKey] = legacy[oldKey];
+            legacy[newKey] = legacy[oldKey];
           }
         }
       );
@@ -53,19 +56,25 @@ export class PluginSettingsManager extends PluginSettingsManagerBase<PluginTypes
       // No replacement key, so the converter is a no-op — the base class's
       // Cleanup pass deletes oldKey from the saved record simply because it's
       // Declared here but no longer a property of PluginSettings.
-      class LegacySettings { [k: string]: unknown; public [oldKey] = undefined; }
-      this.registerLegacySettingsConverter(LegacySettings, () => { /* No-op: pure removal */ });
+      class LegacySettings {
+        [k: string]: unknown;
+        public [oldKey] = undefined;
+      }
+      this.registerLegacySettingsConverter(LegacySettings, () => {/* No-op: pure removal */});
     }
 
     for (const [oldKey, desktopKey, mobileKey] of LEGACY_PULSE_DISPLAY_MODES) {
-      class LegacySettings { [k: string]: unknown; public [oldKey] = undefined; }
+      class LegacySettings {
+        [k: string]: unknown;
+        public [oldKey] = undefined;
+      }
       this.registerLegacySettingsConverter(
         LegacySettings,
         (legacy: Record<string, unknown>) => {
           const modes = normalizeLegacyPulseDisplayMode(legacy[oldKey]);
-          if (!modes) { return; }
-          if (!(desktopKey in legacy)) { legacy[desktopKey] = modes.desktop; }
-          if (!(mobileKey in legacy)) { legacy[mobileKey] = modes.mobile; }
+          if (!modes) return;
+          if (!(desktopKey in legacy)) legacy[desktopKey] = modes.desktop;
+          if (!(mobileKey in legacy)) legacy[mobileKey] = modes.mobile;
         }
       );
     }
@@ -73,8 +82,8 @@ export class PluginSettingsManager extends PluginSettingsManagerBase<PluginTypes
 }
 
 function normalizeLegacyPulseDisplayMode(value: unknown): { desktop: 'always' | 'contextual'; mobile: 'always' | 'contextual' } | null {
-  if (value === 'always') { return { desktop: 'always', mobile: 'always' }; }
-  if (value === 'contextual') { return { desktop: 'contextual', mobile: 'contextual' }; }
-  if (value === 'contextual-desktop') { return { desktop: 'contextual', mobile: 'always' }; }
+  if (value === 'always') return { desktop: 'always', mobile: 'always' };
+  if (value === 'contextual') return { desktop: 'contextual', mobile: 'contextual' };
+  if (value === 'contextual-desktop') return { desktop: 'contextual', mobile: 'always' };
   return null;
 }

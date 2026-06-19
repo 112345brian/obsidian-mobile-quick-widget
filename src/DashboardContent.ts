@@ -1,17 +1,26 @@
 import type {
- App, EventRef, TFile
+  App,
+  EventRef,
+  TFile
 } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
 import {
- Menu, Platform, setIcon
+  Menu,
+  Platform,
+  setIcon
 } from 'obsidian';
 
 import type {
- DashboardWidgetContext, DashboardWidgetRegistry
+  DashboardWidgetContext,
+  DashboardWidgetRegistry
 } from './DashboardWidgetApi.ts';
 import type {
- DashboardViewState, DashboardWidget, PluginSettings, PulseCard, QuickAction
+  DashboardViewState,
+  DashboardWidget,
+  PluginSettings,
+  PulseCard,
+  QuickAction
 } from './PluginSettings.ts';
 
 import { createNote } from './createNote.ts';
@@ -19,7 +28,8 @@ import { getExternalPlugin } from './externalPlugin.ts';
 import { vibrate } from './haptics.ts';
 import { getModifiedTime } from './notes.ts';
 import {
- BUILTIN_DASHBOARD_WIDGET_TYPES, normalizeDashboardWidgets
+  BUILTIN_DASHBOARD_WIDGET_TYPES,
+  normalizeDashboardWidgets
 } from './PluginSettings.ts';
 import { executeQuickAction } from './quickActions.ts';
 import { renderQuickActionIcon } from './renderQuickActionIcon.ts';
@@ -153,7 +163,11 @@ export class DashboardContent {
    *  Modal-hosted dashboard would leak a new subscription on every open. */
   public dispose(): void {
     for (const fn of this.cleanupFns) {
-      try { fn(); } catch (err) { console.error('ReadyBoard: widget cleanup failed', err); }
+      try {
+        fn();
+      } catch (err) {
+        console.error('ReadyBoard: widget cleanup failed', err);
+      }
     }
     this.cleanupFns = [];
   }
@@ -169,7 +183,7 @@ export class DashboardContent {
   }
 
   public async refresh(): Promise<void> {
-    if (!this.host) { return; }
+    if (!this.host) return;
     await this.render(this.host);
   }
 
@@ -182,7 +196,7 @@ export class DashboardContent {
 
     const scroll = host.createEl('div', { cls: 'qw-dash-scroll' });
     const inner = scroll.createEl('div', { cls: 'qw-dash' });
-    if (settings.handedness === 'right') { inner.addClass('qw-dash--right'); }
+    if (settings.handedness === 'right') inner.addClass('qw-dash--right');
 
     // Overdrag-to-new-note: touch-only gesture, skip entirely on desktop.
     const overdragEnabled = Platform.isMobile && settings.enableOverdrag;
@@ -203,10 +217,10 @@ export class DashboardContent {
     await this.renderTodaySection(inner, ctx, widgets, colsFor(inner));
 
     for (const widget of widgets) {
-      if (!widget.enabled) { continue; }
-      if (widget.type === 'radial') { continue; } // Embedded in pulse grid
+      if (!widget.enabled) continue;
+      if (widget.type === 'radial') continue; // Embedded in pulse grid
       const definition = this.widgetRegistry.get(widget.type);
-      if (!definition) { continue; }
+      if (!definition) continue;
       try {
         await definition.render(inner, ctx);
       } catch (err) {
@@ -229,11 +243,16 @@ export class DashboardContent {
       if (next !== lastCols) {
         lastCols = next;
         cancelAnimationFrame(rafId);
-        rafId = window.requestAnimationFrame(() => { void this.render(host); });
+        rafId = window.requestAnimationFrame(() => {
+          void this.render(host);
+        });
       }
     });
     ro.observe(inner);
-    this.cleanupFns.push(() => { ro.disconnect(); cancelAnimationFrame(rafId); });
+    this.cleanupFns.push(() => {
+      ro.disconnect();
+      cancelAnimationFrame(rafId);
+    });
   }
 
   public setViewState(state: DashboardViewState): void {
@@ -243,22 +262,21 @@ export class DashboardContent {
   private attachKeyNav(host: HTMLElement): void {
     let idx = -1;
 
-    const rows = (): HTMLElement[] =>
-      Array.from(host.querySelectorAll<HTMLElement>('.qw-dash-note-row, .qw-dash-task-row'));
+    const rows = (): HTMLElement[] => Array.from(host.querySelectorAll<HTMLElement>('.qw-dash-note-row, .qw-dash-task-row'));
 
     const focus = (next: number): void => {
       const all = rows();
       all[idx]?.removeClass('qw-dash-row--focused');
       idx = Math.max(0, Math.min(next, all.length - 1));
       const el = all[idx];
-      if (!el) { return; }
+      if (!el) return;
       el.addClass('qw-dash-row--focused');
       el.scrollIntoView({ block: 'nearest' });
     };
 
     const onKeyDown = (e: KeyboardEvent): void => {
       const all = rows();
-      if (all.length === 0) { return; }
+      if (all.length === 0) return;
 
       switch (e.key) {
         case 'ArrowDown':
@@ -282,7 +300,10 @@ export class DashboardContent {
           focus(idx < 0 ? all.length - 1 : idx - 1);
           break;
         case 'Enter':
-          if (idx >= 0) { e.preventDefault(); all[idx]?.click(); }
+          if (idx >= 0) {
+            e.preventDefault();
+            all[idx]?.click();
+          }
           break;
         case 'Escape':
           this.close();
@@ -290,17 +311,19 @@ export class DashboardContent {
       }
     };
     host.addEventListener('keydown', onKeyDown);
-    this.cleanupFns.push(() => { host.removeEventListener('keydown', onKeyDown); });
+    this.cleanupFns.push(() => {
+      host.removeEventListener('keydown', onKeyDown);
+    });
 
     // Make the host focusable so keydown fires without clicking first
-    if (!host.hasAttribute('tabindex')) { host.setAttribute('tabindex', '-1'); }
+    if (!host.hasAttribute('tabindex')) host.setAttribute('tabindex', '-1');
     this.focusHost();
   }
 
   private attachOverdrag(scrollEl: HTMLElement, indicator: HTMLElement): void {
     const THRESHOLD = 72;
     const icon = indicator.querySelector<HTMLElement>('.qw-overdrag-icon');
-    if (!icon) { return; }
+    if (!icon) return;
     let startY = 0;
     let pulling = false;
     let peaked = false;
@@ -321,10 +344,16 @@ export class DashboardContent {
     };
 
     const onTouchMove = (e: TouchEvent): void => {
-      if (!pulling) { return; }
-      if (scrollEl.scrollTop > 0) { reset(); return; }
+      if (!pulling) return;
+      if (scrollEl.scrollTop > 0) {
+        reset();
+        return;
+      }
       const delta = e.touches[0]!.clientY - startY;
-      if (delta <= 0) { reset(); return; }
+      if (delta <= 0) {
+        reset();
+        return;
+      }
 
       e.preventDefault();
 
@@ -347,8 +376,11 @@ export class DashboardContent {
     };
 
     const onTouchEnd = async (): Promise<void> => {
-      if (!pulling) { return; }
-      if (!peaked) { reset(); return; }
+      if (!pulling) return;
+      if (!peaked) {
+        reset();
+        return;
+      }
 
       pulling = false;
       indicator.classList.add('qw-overdrag--fired');
@@ -380,7 +412,7 @@ export class DashboardContent {
 
   private async getActiveReferences(): Promise<ReferenceContext> {
     const activeFile = this.app.workspace.getActiveFile();
-    if (!activeFile) { return { activeFile: null, citekeys: [] }; }
+    if (!activeFile) return { activeFile: null, citekeys: [] };
 
     const citationApi = getCitationSuiteApi(this.app);
     if (citationApi) {
@@ -403,7 +435,9 @@ export class DashboardContent {
   // ── Today section (date header + pulse grid) — fixed chrome, not a widget ──
 
   private async handleQuickAction(action: ReadonlyDeep<QuickAction>): Promise<void> {
-    await executeQuickAction(this.app, this.settings, action, () => { this.close(); });
+    await executeQuickAction(this.app, this.settings, action, () => {
+      this.close();
+    });
   }
 
   private populatePulseCard(
@@ -432,7 +466,7 @@ export class DashboardContent {
       }
       case 'git': {
         const git = ctx.git;
-        if (!git?.gitReady) { break; }
+        if (!git?.gitReady) break;
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Git' });
         const gitValueEl = el.createEl('div', { cls: 'qw-dash-pulse-value' });
         const gitSubEl = el.createEl('div', { cls: 'qw-dash-pulse-sub' });
@@ -456,16 +490,18 @@ export class DashboardContent {
         let refreshFrame = 0;
         let refreshInFlight = false;
         const refreshGitStatus = (forceRefresh: boolean): void => {
-          if (!el.isConnected) { return; }
+          if (!el.isConnected) return;
           applyGitStatus(git.cachedStatus);
-          if (!forceRefresh || typeof git.updateCachedStatus !== 'function' || refreshInFlight) { return; }
+          if (!forceRefresh || typeof git.updateCachedStatus !== 'function' || refreshInFlight) return;
 
           refreshInFlight = true;
           void git.updateCachedStatus().then((fresh) => {
-            if (el.isConnected) { applyGitStatus(fresh); }
+            if (el.isConnected) applyGitStatus(fresh);
           }).catch((error: unknown) => {
             console.warn('ReadyBoard: failed to refresh git pulse status', error);
-          }).finally(() => { refreshInFlight = false; });
+          }).finally(() => {
+            refreshInFlight = false;
+          });
         };
         const scheduleGitStatusRefresh = (forceRefresh: boolean): void => {
           cancelAnimationFrame(refreshFrame);
@@ -480,14 +516,22 @@ export class DashboardContent {
 
         const workspaceEvents = this.app.workspace as unknown as WorkspaceEvents;
         const gitEventRefs = [
-          workspaceEvents.on('obsidian-git:status-changed', () => { scheduleGitStatusRefresh(false); }),
-          workspaceEvents.on('obsidian-git:refreshed', () => { scheduleGitStatusRefresh(true); }),
-          workspaceEvents.on('obsidian-git:refresh', () => { scheduleGitStatusRefresh(false); }),
-          workspaceEvents.on('obsidian-git:head-change', () => { scheduleGitStatusRefresh(true); })
+          workspaceEvents.on('obsidian-git:status-changed', () => {
+            scheduleGitStatusRefresh(false);
+          }),
+          workspaceEvents.on('obsidian-git:refreshed', () => {
+            scheduleGitStatusRefresh(true);
+          }),
+          workspaceEvents.on('obsidian-git:refresh', () => {
+            scheduleGitStatusRefresh(false);
+          }),
+          workspaceEvents.on('obsidian-git:head-change', () => {
+            scheduleGitStatusRefresh(true);
+          })
         ];
         widgetCtx.onCleanup(() => {
           cancelAnimationFrame(refreshFrame);
-          for (const ref of gitEventRefs) { workspaceEvents.offref(ref); }
+          for (const ref of gitEventRefs) workspaceEvents.offref(ref);
         });
 
         el.addEventListener('click', (e) => {
@@ -496,10 +540,12 @@ export class DashboardContent {
             const cmds = (this.app as unknown as { commands: { commands: Record<string, { id: string; name: string }> } }).commands.commands;
             for (const cmd of Object.values(cmds)) {
               if (cmd.id.startsWith('obsidian-git:')) {
-                menu.addItem((item) => item.setTitle(cmd.name).onClick(() => {
-                  this.app.commands.executeCommandById(cmd.id);
-                  scheduleGitStatusRefresh(true);
-                }));
+                menu.addItem((item) =>
+                  item.setTitle(cmd.name).onClick(() => {
+                    this.app.commands.executeCommandById(cmd.id);
+                    scheduleGitStatusRefresh(true);
+                  })
+                );
               }
             }
             menu.showAtMouseEvent(e);
@@ -521,8 +567,13 @@ export class DashboardContent {
         setIcon(iconEl, 'home');
         el.addEventListener('click', () => {
           this.close();
-          if (homeFile) { void this.app.workspace.getMostRecentLeaf()?.openFile(homeFile); return; }
-          try { this.app.commands.executeCommandById('homepage:open'); } catch { /* Plugin not installed */ }
+          if (homeFile) {
+            void this.app.workspace.getMostRecentLeaf()?.openFile(homeFile);
+            return;
+          }
+          try {
+            this.app.commands.executeCommandById('homepage:open');
+          } catch { /* Plugin not installed */ }
         });
         break;
       }
@@ -540,7 +591,7 @@ export class DashboardContent {
       }
       case 'pomodoro': {
         const timer = ctx.pomodoroTimer;
-        if (!timer) { break; }
+        if (!timer) break;
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Pomodoro' });
         const timeEl = el.createEl('div', { cls: 'qw-dash-pulse-value' });
         const subEl = el.createEl('div', { cls: 'qw-dash-pulse-sub' });
@@ -554,11 +605,13 @@ export class DashboardContent {
       }
       case 'quick-action': {
         const action = card.quickAction;
-        if (!action) { break; }
+        if (!action) break;
         const iconWrap = el.createEl('div', { cls: 'qw-dash-pulse-action-icon' });
         renderQuickActionIcon(iconWrap, action);
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: action.label });
-        el.addEventListener('click', () => { void this.handleQuickAction(action); });
+        el.addEventListener('click', () => {
+          void this.handleQuickAction(action);
+        });
         break;
       }
       case 'references': {
@@ -591,14 +644,17 @@ export class DashboardContent {
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Needs review' });
         el.createEl('div', { cls: 'qw-dash-pulse-value', text: String(ctx.trashCount) });
         el.createEl('div', { cls: 'qw-dash-pulse-sub', text: 'stale notes' });
-        el.addEventListener('click', () => { this.close(); void ctx.trashApi?.openTriage(); });
+        el.addEventListener('click', () => {
+          this.close();
+          void ctx.trashApi?.openTriage();
+        });
         break;
       }
       case 'vault': {
         const noteCount = ctx.allFiles.length;
         const noteStr = noteCount >= 1000 ? `${(noteCount / 1000).toFixed(1)}k` : String(noteCount);
         let linkCount = 0;
-        for (const f of ctx.allFiles) { linkCount += this.app.metadataCache.getFileCache(f)?.links?.length ?? 0; }
+        for (const f of ctx.allFiles) linkCount += this.app.metadataCache.getFileCache(f)?.links?.length ?? 0;
         const linkStr = linkCount >= 1000 ? `${(linkCount / 1000).toFixed(1)}k` : String(linkCount);
         el.createEl('div', { cls: 'qw-dash-pulse-label', text: 'Vault' });
         el.createEl('div', { cls: 'qw-dash-pulse-value qw-dash-pulse-value--gold', text: noteStr });
@@ -612,7 +668,7 @@ export class DashboardContent {
     const cards = (ctx.settings.pulseCards ?? []).filter((c) => c.enabled);
     const radialEnabled = normalizedWidgets.some((w) => w.type === 'radial' && w.enabled);
 
-    if (cards.length === 0 && !radialEnabled) { return; }
+    if (cards.length === 0 && !radialEnabled) return;
 
     const dateRow = root.createEl('div', { cls: 'qw-dash-date-row' });
     dateRow.createEl('span', { cls: 'qw-dash-date', text: `TODAY · ${headerDate()}` });
@@ -622,7 +678,8 @@ export class DashboardContent {
     const trashApi = needsTrash ? getTrashApi(this.app) : null;
     const trashCount = trashApi ? trashApi.getCandidates().length : 0;
     const allFiles = this.app.vault.getMarkdownFiles();
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const gitPlugin = cards.some((c) => c.type === 'git')
       ? (getExternalPlugin<GitPlugin>(this.app, 'obsidian-git') ?? null)
       : null;
@@ -644,7 +701,7 @@ export class DashboardContent {
       : 0;
     const pomodoroTimer = cards.some((c) => c.type === 'pomodoro') ? getPomodoroTimer(this.app) : null;
     const pomodoroState = getImmediatePomodoroState(pomodoroTimer);
-    if (pomodoroState) { rememberPomodoroActivity(pomodoroState); }
+    if (pomodoroState) rememberPomodoroActivity(pomodoroState);
     const pomodoroRunningOrRecent = isPomodoroStateRelevant(pomodoroState);
     const activeReferences = cards.some((c) => c.type === 'references')
       ? await this.getActiveReferences()
@@ -652,20 +709,20 @@ export class DashboardContent {
     const contextMode = isContextPulseMode(ctx);
 
     const visibleCards = cards.filter((c) => {
-      if (c.type === 'trash') { return trashCount > 0; }
+      if (c.type === 'trash') return trashCount > 0;
       if (c.type === 'git') {
-        if (contextMode) { return hasRelevantGitStatus(gitStatus); }
+        if (contextMode) return hasRelevantGitStatus(gitStatus);
         return gitPlugin?.gitReady === true;
       }
-      if (c.type === 'inbox') { return inboxCount > 0; }
-      if (c.type === 'pomodoro') { return pomodoroRunningOrRecent; }
-      if (c.type === 'references') { return activeReferences.citekeys.length > 0; }
-      if (!contextMode) { return true; }
-      if (c.type === 'modified-today') { return modifiedTodayCount > 0; }
+      if (c.type === 'inbox') return inboxCount > 0;
+      if (c.type === 'pomodoro') return pomodoroRunningOrRecent;
+      if (c.type === 'references') return activeReferences.citekeys.length > 0;
+      if (!contextMode) return true;
+      if (c.type === 'modified-today') return modifiedTodayCount > 0;
       return false;
     });
 
-    if (visibleCards.length === 0 && !radialEnabled) { return; }
+    if (visibleCards.length === 0 && !radialEnabled) return;
 
     const grid = root.createEl('div', { cls: 'qw-dash-pulse-grid' });
     // Grid-template-columns is set from the caller-measured cols (see render()).
@@ -703,18 +760,28 @@ export class DashboardContent {
       const span = Math.min(card.size ?? 1, cols); // Clamp span to column count
 
       // Wrap to next row if span doesn't fit
-      if (col + span - 1 > cols) { row++; col = 1; }
+      if (col + span - 1 > cols) {
+        row++;
+        col = 1;
+      }
 
       // Radial row constraints
       if (radialEnabled && row === radialGridRow) {
         if (radialFullRow) {
           // Entire row is the radial — push pulse cards past it
-          row++; col = 1;
+          row++;
+          col = 1;
         } else {
           // 3-col: only span-1 cards can flank; skip RADIAL_COL (center)
-          if (col === 1 && span > 1) { row++; col = 1; } else if (col === RADIAL_COL) {
+          if (col === 1 && span > 1) {
+            row++;
+            col = 1;
+          } else if (col === RADIAL_COL) {
             col = RADIAL_COL + 1;
-            if (col > cols || span > 1) { row++; col = 1; }
+            if (col > cols || span > 1) {
+              row++;
+              col = 1;
+            }
           }
         }
       }
@@ -725,11 +792,14 @@ export class DashboardContent {
       this.populatePulseCard(el, card, pctx, ctx);
 
       // Flankers only exist in 3-col mode
-      if (radialEnabled && !radialFullRow && row === radialGridRow && col === 1) { leftFlankerEl = el; }
-      if (radialEnabled && !radialFullRow && row === radialGridRow && col === cols && RADIAL_COL < cols) { rightFlankerEl = el; }
+      if (radialEnabled && !radialFullRow && row === radialGridRow && col === 1) leftFlankerEl = el;
+      if (radialEnabled && !radialFullRow && row === radialGridRow && col === cols && RADIAL_COL < cols) rightFlankerEl = el;
 
       col += span;
-      if (col > cols) { col = 1; row++; }
+      if (col > cols) {
+        col = 1;
+        row++;
+      }
     }
 
     if (radialEnabled) {
@@ -750,26 +820,26 @@ export class DashboardContent {
     const useSidebar = this.isSidebar && base.dashboardSeparateSettings;
     const settings = useSidebar
       ? {
-          ...base,
-          breadcrumbField: base.sidebarBreadcrumbField,
-          cardFrontmatterFields: base.sidebarCardFrontmatterFields,
-          cardShowBacklinks: base.sidebarCardShowBacklinks,
-          cardShowPreview: base.sidebarCardShowPreview,
-          cardShowTags: base.sidebarCardShowTags,
-          dashboardRadialInteraction: base.sidebarDashboardRadialInteraction,
-          dashboardRadialLastMode: base.sidebarDashboardRadialLastMode,
-          dashboardRadialMode: base.sidebarDashboardRadialMode,
-          dashboardWidgets: base.sidebarWidgets,
-          modifiedListCount: base.sidebarModifiedListCount,
-          pulseCardDesktopDisplayMode: base.sidebarPulseCardDesktopDisplayMode,
-          pulseCardMobileDisplayMode: base.sidebarPulseCardMobileDisplayMode,
-          pulseCards: base.sidebarPulseCards ?? [],
-          recentListCount: base.sidebarRecentListCount,
-          showBreadcrumbs: base.sidebarShowBreadcrumbs
-        } as ReadonlyDeep<PluginSettings>
+        ...base,
+        breadcrumbField: base.sidebarBreadcrumbField,
+        cardFrontmatterFields: base.sidebarCardFrontmatterFields,
+        cardShowBacklinks: base.sidebarCardShowBacklinks,
+        cardShowPreview: base.sidebarCardShowPreview,
+        cardShowTags: base.sidebarCardShowTags,
+        dashboardRadialInteraction: base.sidebarDashboardRadialInteraction,
+        dashboardRadialLastMode: base.sidebarDashboardRadialLastMode,
+        dashboardRadialMode: base.sidebarDashboardRadialMode,
+        dashboardWidgets: base.sidebarWidgets,
+        modifiedListCount: base.sidebarModifiedListCount,
+        pulseCardDesktopDisplayMode: base.sidebarPulseCardDesktopDisplayMode,
+        pulseCardMobileDisplayMode: base.sidebarPulseCardMobileDisplayMode,
+        pulseCards: base.sidebarPulseCards ?? [],
+        recentListCount: base.sidebarRecentListCount,
+        showBreadcrumbs: base.sidebarShowBreadcrumbs
+      } as ReadonlyDeep<PluginSettings>
       : base;
 
-    if (Object.keys(this.viewState).length === 0) { return settings; }
+    if (Object.keys(this.viewState).length === 0) return settings;
 
     return {
       ...settings,
@@ -796,10 +866,14 @@ export class DashboardContent {
   private widgetContext(settings: ReadonlyDeep<PluginSettings>): DashboardWidgetContext {
     return {
       app: this.app,
-      close: () => { this.close(); },
+      close: () => {
+        this.close();
+      },
       editSettings: this.editSettings,
       getPlugin: (id) => getExternalPlugin(this.app, id),
-      onCleanup: (fn) => { this.cleanupFns.push(fn); },
+      onCleanup: (fn) => {
+        this.cleanupFns.push(fn);
+      },
       openFile: (file) => {
         this.close();
         void this.app.workspace.getMostRecentLeaf()?.openFile(file);
@@ -821,7 +895,7 @@ function computeStreak(files: TFile[], today: Date): number {
   const cursor = new Date(today);
   while (true) {
     const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
-    if (!days.has(key)) { break; }
+    if (!days.has(key)) break;
     count++;
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -829,7 +903,7 @@ function computeStreak(files: TFile[], today: Date): number {
 }
 
 function countInboxFiles(app: App, inboxPath: string): number {
-  if (!inboxPath) { return 0; }
+  if (!inboxPath) return 0;
   return app.vault.getMarkdownFiles().filter(
     (f) => f.path.startsWith(`${inboxPath}/`) || f.parent?.path === inboxPath
   ).length;
@@ -843,7 +917,7 @@ function extractCitekeys(markdown: string): string[] {
   const regex = /(?:^|[^\w])@([A-Za-z0-9][A-Za-z0-9_:.#$%&+?<>/~'-]*)(?=[,;\]\)\s]|$)/gu;
   for (const match of withoutCode.matchAll(regex)) {
     const key = match[1]?.replace(/[.,;:]+$/u, '');
-    if (key) { keys.add(key); }
+    if (key) keys.add(key);
   }
   return [...keys];
 }
@@ -851,16 +925,18 @@ function extractCitekeys(markdown: string): string[] {
 function getCitationSuiteApi(app: App): BripeyCitationSuiteApi | null {
   const plugin = getExternalPlugin<{ api?: BripeyCitationSuiteApi }>(app, 'bripey-citation-suite');
   const api = plugin?.api;
-  if (api?.version !== 1) { return null; }
-  if (typeof api.focusReferenceListView !== 'function') { return null; }
-  if (typeof api.getCitekeysForFile !== 'function') { return null; }
+  if (api?.version !== 1) return null;
+  if (typeof api.focusReferenceListView !== 'function') return null;
+  if (typeof api.getCitekeysForFile !== 'function') return null;
   return api;
 }
 
 function getImmediatePomodoroState(timer: null | PomodoroTimer): null | TimerStore {
-  if (!timer) { return null; }
+  if (!timer) return null;
   let current: null | TimerStore = null;
-  const unsubscribe = timer.subscribe((state) => { current = state; });
+  const unsubscribe = timer.subscribe((state) => {
+    current = state;
+  });
   unsubscribe();
   return current;
 }
@@ -868,14 +944,14 @@ function getImmediatePomodoroState(timer: null | PomodoroTimer): null | TimerSto
 function getPomodoroTimer(app: App): null | PomodoroTimer {
   const plugin = getExternalPlugin<{ timer?: PomodoroTimer }>(app, 'pomodoro-timer');
   const timer = plugin?.timer;
-  if (!timer || typeof timer.subscribe !== 'function') { return null; }
+  if (!timer || typeof timer.subscribe !== 'function') return null;
   return timer;
 }
 
 function getTrashApi(app: App): null | TrashApi {
   const plugin = getExternalPlugin<{ api?: TrashApi }>(app, 'trash-collection');
   const api = plugin?.api;
-  if (!api || typeof api.getCandidates !== 'function') { return null; }
+  if (!api || typeof api.getCandidates !== 'function') return null;
   return api;
 }
 
@@ -903,10 +979,10 @@ function isContextPulseMode(ctx: DashboardWidgetContext): boolean {
 }
 
 function isPomodoroStateRelevant(state: null | TimerStore, now = Date.now()): boolean {
-  if (!state) { return false; }
-  if (state.running) { return true; }
+  if (!state) return false;
+  if (state.running) return true;
   const startTime = typeof state.startTime === 'number' ? state.startTime : null;
-  if (state.inSession && startTime !== null && now - startTime <= POMODORO_RECENT_MS) { return true; }
+  if (state.inSession && startTime !== null && now - startTime <= POMODORO_RECENT_MS) return true;
   return pomodoroLastRelevantAt > 0 && now - pomodoroLastRelevantAt <= POMODORO_RECENT_MS;
 }
 

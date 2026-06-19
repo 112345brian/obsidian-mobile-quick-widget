@@ -1,12 +1,14 @@
 import type {
- App, TFile
+  App,
+  TFile
 } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
 import type { PluginSettings } from './PluginSettings.ts';
 
 import {
- getBCGraph, getFrontmatterLinkTargets
+  getBCGraph,
+  getFrontmatterLinkTargets
 } from './breadcrumbs.ts';
 import { isExcluded } from './recents.ts';
 
@@ -26,11 +28,11 @@ export function getModifiedTime(app: App, settings: ReadonlyDeep<PluginSettings>
   const field = settings.modifiedDateField;
   if (field) {
     const val = app.metadataCache.getFileCache(file)?.frontmatter?.[field] as unknown;
-    if (val instanceof Date) { return val.getTime(); }
-    if (typeof val === 'number' && val > 1e11) { return val; } // Looks like a ms epoch timestamp
+    if (val instanceof Date) return val.getTime();
+    if (typeof val === 'number' && val > 1e11) return val; // Looks like a ms epoch timestamp
     if (typeof val === 'string') {
       const t = Date.parse(val);
-      if (!isNaN(t)) { return t; }
+      if (!isNaN(t)) return t;
     }
   }
   return file.stat.mtime;
@@ -50,7 +52,7 @@ export function getParentNames(app: App, settings: ReadonlyDeep<PluginSettings>,
           const path = e.target_id.endsWith('.md') ? e.target_id : `${e.target_id}.md`;
           return app.vault.getFileByPath(path)?.basename ?? app.vault.getFileByPath(e.target_id)?.basename ?? e.target_id.split('/').pop() ?? e.target_id;
         });
-      if (names.length > 0) { return names; }
+      if (names.length > 0) return names;
     } catch { /* Fall through */ }
   }
   const field = settings.breadcrumbField || 'up';
@@ -64,8 +66,10 @@ export function noteTags(file: TFile, app: App): string[] {
   const inline = (cache?.tags ?? []).map((t) => t.tag);
   const rawTags: unknown = cache?.frontmatter?.['tags'];
   const tagArr: string[] = Array.isArray(rawTags)
-    ? (rawTags).filter((t): t is string => typeof t === 'string')
-    : typeof rawTags === 'string' ? [rawTags] : [];
+    ? rawTags.filter((t): t is string => typeof t === 'string')
+    : typeof rawTags === 'string'
+    ? [rawTags]
+    : [];
   const fm = tagArr.map((t) => `#${t}`);
   return [...new Set([...inline, ...fm])].slice(0, 2);
 }

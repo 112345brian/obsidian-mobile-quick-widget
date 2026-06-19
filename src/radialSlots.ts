@@ -1,5 +1,6 @@
 import type {
- App, TFile
+  App,
+  TFile
 } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
@@ -7,7 +8,9 @@ import { Menu } from 'obsidian';
 
 import type { CategorizedNeighbors } from './breadcrumbs.ts';
 import type {
- PluginSettings, QuickAction, QuickActionIconType
+  PluginSettings,
+  QuickAction,
+  QuickActionIconType
 } from './PluginSettings.ts';
 
 import { executeQuickAction } from './quickActions.ts';
@@ -50,7 +53,7 @@ export function buildBreadcrumbSlots(
   openFile: (file: TFile) => void,
   onOverflow: (overflowChildren: TFile[], event: MouseEvent) => void
 ): (RadialSlotData | undefined)[] {
-  if (!nb) { return new Array<RadialSlotData | undefined>(SLOT_COUNT).fill(undefined); }
+  if (!nb) return new Array<RadialSlotData | undefined>(SLOT_COUNT).fill(undefined);
 
   // Right flank prefers the explicit "next" sequence note, left prefers "prev".
   // Remaining sibling slots are filled from a shared queue so none is dropped
@@ -60,16 +63,52 @@ export function buildBreadcrumbSlots(
   const leftSibling = nb.prev[0] ?? sibQueue.shift();
 
   const parentSlot = (f: TFile | undefined): RadialSlotData | undefined =>
-    f ? { arrow: '↑', kind: 'parent', label: 'parent', onTap: () => { openFile(f); }, title: truncate(f.basename, TITLE_MAX_LEN) } : undefined;
+    f
+      ? {
+        arrow: '↑',
+        kind: 'parent',
+        label: 'parent',
+        onTap: () => {
+          openFile(f);
+        },
+        title: truncate(f.basename, TITLE_MAX_LEN)
+      }
+      : undefined;
   const childSlot = (f: TFile | undefined): RadialSlotData | undefined =>
-    f ? { arrow: '↓', kind: 'child', label: 'child', onTap: () => { openFile(f); }, title: truncate(f.basename, TITLE_MAX_LEN) } : undefined;
+    f
+      ? {
+        arrow: '↓',
+        kind: 'child',
+        label: 'child',
+        onTap: () => {
+          openFile(f);
+        },
+        title: truncate(f.basename, TITLE_MAX_LEN)
+      }
+      : undefined;
   const siblingSlot = (f: TFile | undefined, arrow: string): RadialSlotData | undefined =>
-    f ? { arrow, kind: 'sibling', label: 'sibling', onTap: () => { openFile(f); }, title: truncate(f.basename, TITLE_MAX_LEN) } : undefined;
+    f
+      ? {
+        arrow,
+        kind: 'sibling',
+        label: 'sibling',
+        onTap: () => {
+          openFile(f);
+        },
+        title: truncate(f.basename, TITLE_MAX_LEN)
+      }
+      : undefined;
 
   // 8 o'clock: overflow if there are more children than the two child slots
   const extraChildren = nb.children.length - 2;
   const overflowSlot: RadialSlotData | undefined = extraChildren > 0
-    ? { kind: 'overflow', label: `+${extraChildren}`, onTap: (event) => { onOverflow(nb.children.slice(2), event); } }
+    ? {
+      kind: 'overflow',
+      label: `+${extraChildren}`,
+      onTap: (event) => {
+        onOverflow(nb.children.slice(2), event);
+      }
+    }
     : childSlot(nb.children[2]);
 
   return [
@@ -91,15 +130,19 @@ export function buildCommandSlots(
   const slots: (RadialSlotData | undefined)[] = [];
   for (let i = 0; i < SLOT_COUNT; i++) {
     const action = commands[i];
-    slots.push(action
-      ? {
+    slots.push(
+      action
+        ? {
           icon: action.icon || '·',
           iconType: action.iconType,
           kind: 'cmd',
           label: action.label,
-          onTap: () => { void executeQuickAction(app, settings, action, close); }
+          onTap: () => {
+            void executeQuickAction(app, settings, action, close);
+          }
         }
-      : undefined);
+        : undefined
+    );
   }
   return slots;
 }
@@ -113,9 +156,17 @@ export function buildRecentSlots(
   const slots: (RadialSlotData | undefined)[] = [];
   for (let i = 0; i < SLOT_COUNT; i++) {
     const file = files[i];
-    slots.push(file
-      ? { kind: 'recent', label: truncate(file.basename, TITLE_MAX_LEN), onTap: () => { openFile(file); } }
-      : undefined);
+    slots.push(
+      file
+        ? {
+          kind: 'recent',
+          label: truncate(file.basename, TITLE_MAX_LEN),
+          onTap: () => {
+            openFile(file);
+          }
+        }
+        : undefined
+    );
   }
   return slots;
 }
@@ -131,7 +182,11 @@ export function buildRecentSlots(
 export function showOverflowMenu(files: readonly TFile[], event: MouseEvent, openFile: (file: TFile) => void): void {
   const menu = new Menu();
   for (const file of files) {
-    menu.addItem((item) => item.setTitle(file.basename).onClick(() => { openFile(file); }));
+    menu.addItem((item) =>
+      item.setTitle(file.basename).onClick(() => {
+        openFile(file);
+      })
+    );
   }
   menu.showAtMouseEvent(event);
 }

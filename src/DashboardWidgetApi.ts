@@ -1,10 +1,12 @@
 import type {
- App, TFile
+  App,
+  TFile
 } from 'obsidian';
 import type { ReadonlyDeep } from 'type-fest';
 
 import type {
- DashboardViewState, PluginSettings
+  DashboardViewState,
+  PluginSettings
 } from './PluginSettings.ts';
 
 /**
@@ -136,7 +138,7 @@ export class DashboardWidgetRegistry {
   public register(definition: DashboardWidgetDefinition): () => void {
     this.widgets.set(definition.id, definition);
     return () => {
-      if (this.widgets.get(definition.id) === definition) { this.widgets.delete(definition.id); }
+      if (this.widgets.get(definition.id) === definition) this.widgets.delete(definition.id);
     };
   }
 }

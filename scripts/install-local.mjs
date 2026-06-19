@@ -1,4 +1,9 @@
-import { copyFileSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  utimesSync,
+  writeFileSync
+} from 'node:fs';
 import { join } from 'node:path';
 
 const defaultVault = '/Users/bri/MEGA/LIBRARY/OBSIDIAN';

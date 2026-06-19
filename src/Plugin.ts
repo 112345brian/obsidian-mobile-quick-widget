@@ -5,7 +5,8 @@ import { PluginBase } from 'obsidian-dev-utils/obsidian/plugin/plugin-base';
 
 import type { ReadyBoardApi } from './DashboardWidgetApi.ts';
 import type {
- DashboardViewState, PluginSettings
+  DashboardViewState,
+  PluginSettings
 } from './PluginSettings.ts';
 import type { PluginTypes } from './PluginTypes.ts';
 
@@ -15,7 +16,8 @@ import { RadialMenuV3Modal } from './Modals/RadialMenuV3Modal.ts';
 import { PluginSettingsManager } from './PluginSettingsManager.ts';
 import { PluginSettingsTab } from './PluginSettingsTab.ts';
 import {
- DashboardView, VIEW_TYPE_DASHBOARD
+  DashboardView,
+  VIEW_TYPE_DASHBOARD
 } from './Views/DashboardView.ts';
 import { BUILTIN_WIDGETS } from './widgets/index.ts';
 
@@ -32,7 +34,9 @@ export class Plugin extends PluginBase<PluginTypes> {
   /** Public surface for other plugins. Access via:
    *  `app.plugins.plugins['readyboard']?.api?.registerWidget(...)` */
   public readonly api: ReadyBoardApi = {
-    openDashboardSidebar: (state) => { this.openDashboardSidebar(state); },
+    openDashboardSidebar: (state) => {
+      this.openDashboardSidebar(state);
+    },
     registerWidget: (definition) => this.dashboardWidgetRegistry.register(definition)
   };
 
@@ -71,19 +75,25 @@ export class Plugin extends PluginBase<PluginTypes> {
     );
 
     this.addCommand({
-      callback: () => { this.openRadialV3(); },
+      callback: () => {
+        this.openRadialV3();
+      },
       id: 'open-radial-menu',
       name: 'Open radial menu'
     });
 
     this.addCommand({
-      callback: () => { this.openDashboard(); },
+      callback: () => {
+        this.openDashboard();
+      },
       id: 'open-dashboard',
       name: 'Open dashboard'
     });
 
     this.addCommand({
-      callback: () => { this.openDashboardSidebar(); },
+      callback: () => {
+        this.openDashboardSidebar();
+      },
       id: 'open-dashboard-sidebar',
       name: 'Open dashboard in sidebar'
     });
@@ -93,7 +103,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     }));
 
     this.registerEvent(this.app.metadataCache.on('changed', (file) => {
-      if (file === this.app.workspace.getActiveFile()) { this.queueDashboardSidebarRefresh(); }
+      if (file === this.app.workspace.getActiveFile()) this.queueDashboardSidebarRefresh();
     }));
 
     const workspaceEvents = this.app.workspace as unknown as WorkspaceEvents;
@@ -108,7 +118,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     _loadedSettings: ExtractReadonlyPluginSettingsWrapper<PluginTypes>,
     isInitialLoad: boolean
   ): Promise<void> {
-    if (!isInitialLoad) { await this.refreshDashboardSidebars(); }
+    if (!isInitialLoad) await this.refreshDashboardSidebars();
   }
 
   protected override async onSaveSettings(
@@ -116,7 +126,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     _oldSettings: ExtractReadonlyPluginSettingsWrapper<PluginTypes>,
     context: unknown
   ): Promise<void> {
-    if (typeof context === 'object' && context !== null && (context as { source?: unknown }).source === 'dashboard-runtime') { return; }
+    if (typeof context === 'object' && context !== null && (context as { source?: unknown }).source === 'dashboard-runtime') return;
     await this.refreshDashboardSidebars();
   }
 
@@ -148,7 +158,7 @@ export class Plugin extends PluginBase<PluginTypes> {
   private async refreshDashboardSidebars(): Promise<void> {
     await Promise.all(
       this.app.workspace.getLeavesOfType(VIEW_TYPE_DASHBOARD).map(async (leaf) => {
-        if (leaf.view instanceof DashboardView) { await leaf.view.refresh(); }
+        if (leaf.view instanceof DashboardView) await leaf.view.refresh();
       })
     );
   }
@@ -169,7 +179,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     const side = this.settings.dashboardSidebarSide === 'left'
       ? (workspace.getLeftLeaf(false) ?? workspace.getLeftLeaf(true))
       : (workspace.getRightLeaf(false) ?? workspace.getRightLeaf(true));
-    if (!side) { return; }
+    if (!side) return;
     await side.setViewState({ active: true, state: state ? { ...state } : {}, type: VIEW_TYPE_DASHBOARD });
     await workspace.revealLeaf(side);
     (side.view as DashboardView).focusHost();

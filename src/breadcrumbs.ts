@@ -1,5 +1,6 @@
 import type {
- App, TFile
+  App,
+  TFile
 } from 'obsidian';
 
 import { getExternalPlugin } from './externalPlugin.ts';
@@ -29,9 +30,12 @@ export function getBCGraph(app: App): BCGraph | null {
  *   ("lateral"). Purple is reserved for commands/chrome and never appears here.
  */
 export const REL_PALETTE = {
-  gold: '#c9a84c', goldBright: '#e3c98a',
-  rose: '#bf5c7c', roseBright: '#e08aa6',
-  teal: '#4ca8a0', tealBright: '#7fd0c8'
+  gold: '#c9a84c',
+  goldBright: '#e3c98a',
+  rose: '#bf5c7c',
+  roseBright: '#e08aa6',
+  teal: '#4ca8a0',
+  tealBright: '#7fd0c8'
 } as const;
 
 export interface CategorizedNeighbors {
@@ -59,7 +63,7 @@ export function getCategorizedNeighbors(app: App, center: TFile, parentField = '
   const outgoing = Object.keys(resolved[center.path] ?? {});
   const incoming: string[] = [];
   for (const [src, links] of Object.entries(resolved)) {
-    if (src !== center.path && links[center.path]) { incoming.push(src); }
+    if (src !== center.path && links[center.path]) incoming.push(src);
   }
   const neighborPaths = [...new Set([...outgoing, ...incoming])];
   const relations = resolveBCRelations(app, center, neighborPaths, parentField);
@@ -67,13 +71,23 @@ export function getCategorizedNeighbors(app: App, center: TFile, parentField = '
   const out: CategorizedNeighbors = { children: [], next: [], parents: [], prev: [], siblings: [] };
   for (const [path, info] of relations) {
     const file = app.vault.getFileByPath(path);
-    if (!file) { continue; }
+    if (!file) continue;
     switch (info.rel) {
-      case 'child': out.children.push(file); break;
-      case 'next': out.next.push(file); break;
-      case 'parent': out.parents.push(file); break;
-      case 'prev': out.prev.push(file); break;
-      case 'sibling': out.siblings.push(file); break;
+      case 'child':
+        out.children.push(file);
+        break;
+      case 'next':
+        out.next.push(file);
+        break;
+      case 'parent':
+        out.parents.push(file);
+        break;
+      case 'prev':
+        out.prev.push(file);
+        break;
+      case 'sibling':
+        out.siblings.push(file);
+        break;
     }
   }
   return out;
@@ -85,7 +99,7 @@ export function getFrontmatterLinkTargets(app: App, file: TFile, keyPrefix: stri
   for (const link of links) {
     if (link.key === keyPrefix || link.key.startsWith(`${keyPrefix}.`)) {
       const target = app.metadataCache.getFirstLinkpathDest(link.link, file.path);
-      if (target) { result.add(target.path); }
+      if (target) result.add(target.path);
     }
   }
   return result;
@@ -95,12 +109,16 @@ export function getFrontmatterLinkTargets(app: App, file: TFile, keyPrefix: stri
 
 export function relColor(rel: BCRel | undefined): { label: string; node: string } {
   switch (rel) {
-    case 'child': return { label: REL_PALETTE.tealBright, node: REL_PALETTE.teal };
+    case 'child':
+      return { label: REL_PALETTE.tealBright, node: REL_PALETTE.teal };
     case 'next':
     case 'prev':
-    case 'sibling': return { label: REL_PALETTE.roseBright, node: REL_PALETTE.rose };
-    case 'parent': return { label: REL_PALETTE.goldBright, node: REL_PALETTE.gold };
-    default: return { label: '#9b7ce8', node: '#3a3a50' };
+    case 'sibling':
+      return { label: REL_PALETTE.roseBright, node: REL_PALETTE.rose };
+    case 'parent':
+      return { label: REL_PALETTE.goldBright, node: REL_PALETTE.gold };
+    default:
+      return { label: '#9b7ce8', node: '#3a3a50' };
   }
 }
 
@@ -155,13 +173,19 @@ export function resolveBCRelations(
             break;
           }
         }
-        if (result.has(path)) { continue; }
+        if (result.has(path)) continue;
       }
       // If neighbor's next/prev points to center, or center's next/prev resolves from neighbor
       const neighborNext = getFrontmatterLinkTargets(app, file, 'next');
       const neighborPrev = getFrontmatterLinkTargets(app, file, 'prev');
-      if (neighborNext.has(center.path)) { result.set(path, { rel: 'prev' }); continue; }
-      if (neighborPrev.has(center.path)) { result.set(path, { rel: 'next' }); continue; }
+      if (neighborNext.has(center.path)) {
+        result.set(path, { rel: 'prev' });
+        continue;
+      }
+      if (neighborPrev.has(center.path)) {
+        result.set(path, { rel: 'next' });
+        continue;
+      }
     }
   }
 
