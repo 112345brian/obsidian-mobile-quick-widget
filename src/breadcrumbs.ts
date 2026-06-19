@@ -63,7 +63,7 @@ export function getCategorizedNeighbors(app: App, center: TFile, parentField = '
   const outgoing = Object.keys(resolved[center.path] ?? {});
   const incoming: string[] = [];
   for (const [src, links] of Object.entries(resolved)) {
-    if (src !== center.path && links[center.path]) incoming.push(src);
+    if (src !== center.path && links[center.path]) { incoming.push(src); }
   }
   const neighborPaths = [...new Set([...outgoing, ...incoming])];
   const relations = resolveBCRelations(app, center, neighborPaths, parentField);
@@ -71,7 +71,7 @@ export function getCategorizedNeighbors(app: App, center: TFile, parentField = '
   const out: CategorizedNeighbors = { children: [], next: [], parents: [], prev: [], siblings: [] };
   for (const [path, info] of relations) {
     const file = app.vault.getFileByPath(path);
-    if (!file) continue;
+    if (!file) { continue; }
     switch (info.rel) {
       case 'child':
         out.children.push(file);
@@ -99,7 +99,7 @@ export function getFrontmatterLinkTargets(app: App, file: TFile, keyPrefix: stri
   for (const link of links) {
     if (link.key === keyPrefix || link.key.startsWith(`${keyPrefix}.`)) {
       const target = app.metadataCache.getFirstLinkpathDest(link.link, file.path);
-      if (target) result.add(target.path);
+      if (target) { result.add(target.path); }
     }
   }
   return result;
@@ -173,7 +173,7 @@ export function resolveBCRelations(
             break;
           }
         }
-        if (result.has(path)) continue;
+        if (result.has(path)) { continue; }
       }
       // If neighbor's next/prev points to center, or center's next/prev resolves from neighbor
       const neighborNext = getFrontmatterLinkTargets(app, file, 'next');

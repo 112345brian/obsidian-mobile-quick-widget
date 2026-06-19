@@ -44,7 +44,7 @@ export function isExcluded(file: TFile, excluded: readonly string[]): boolean {
 
 function getContinueRecentPaths(app: App): null | string[] {
   const plugin = getExternalPlugin<ContinuePlugin>(app, 'obsidian-continue');
-  if (!plugin) return null;
+  if (!plugin) { return null; }
   if (plugin.api?.version === 1 && typeof plugin.api.getRecentPaths === 'function') {
     return plugin.api.getRecentPaths();
   }

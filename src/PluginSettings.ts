@@ -129,7 +129,7 @@ export function normalizeDashboardWidgets(
   const hasSavedRadial = renamed.some((widget) => widget.type === 'radial');
 
   for (const widget of renamed) {
-    if (seen.has(widget.type)) continue;
+    if (seen.has(widget.type)) { continue; }
     if (widget.type === 'graph' && widget.enabled && !hasSavedRadial && knownIds.includes('radial')) {
       output.push({ enabled: true, type: 'radial' });
       seen.add('radial');
@@ -256,7 +256,7 @@ export class PluginSettings {
 }
 
 export function normalizeDashboardViewState(state: unknown): DashboardViewState {
-  if (!isRecord(state)) return {};
+  if (!isRecord(state)) { return {}; }
 
   const normalized: DashboardViewState = {};
   const recentListCount = positiveInteger(state['recentListCount']);
@@ -270,25 +270,25 @@ export function normalizeDashboardViewState(state: unknown): DashboardViewState 
   const interaction = dashboardRadialInteraction(state['radialInteraction'] ?? state['dashboardRadialInteraction']);
   const fields = stringArray(state['cardFrontmatterFields']);
 
-  if (recentListCount !== undefined) normalized.recentListCount = recentListCount;
-  if (modifiedListCount !== undefined) normalized.modifiedListCount = modifiedListCount;
-  if (widgets) normalized.widgets = widgets;
-  if (cards) normalized.pulseCards = cards;
+  if (recentListCount !== undefined) { normalized.recentListCount = recentListCount; }
+  if (modifiedListCount !== undefined) { normalized.modifiedListCount = modifiedListCount; }
+  if (widgets) { normalized.widgets = widgets; }
+  if (cards) { normalized.pulseCards = cards; }
   if (legacyDisplayMode) {
     normalized.pulseCardDesktopDisplayMode = legacyDisplayMode.desktop;
     normalized.pulseCardMobileDisplayMode = legacyDisplayMode.mobile;
   }
-  if (desktopDisplayMode) normalized.pulseCardDesktopDisplayMode = desktopDisplayMode;
-  if (mobileDisplayMode) normalized.pulseCardMobileDisplayMode = mobileDisplayMode;
-  if (mode) normalized.radialMode = mode;
-  if (interaction) normalized.radialInteraction = interaction;
-  if (fields) normalized.cardFrontmatterFields = fields;
+  if (desktopDisplayMode) { normalized.pulseCardDesktopDisplayMode = desktopDisplayMode; }
+  if (mobileDisplayMode) { normalized.pulseCardMobileDisplayMode = mobileDisplayMode; }
+  if (mode) { normalized.radialMode = mode; }
+  if (interaction) { normalized.radialInteraction = interaction; }
+  if (fields) { normalized.cardFrontmatterFields = fields; }
 
   for (const key of ['showBreadcrumbs', 'cardShowTags', 'cardShowPreview', 'cardShowBacklinks'] as const) {
-    if (typeof state[key] === 'boolean') normalized[key] = state[key];
+    if (typeof state[key] === 'boolean') { normalized[key] = state[key]; }
   }
 
-  if (typeof state['breadcrumbField'] === 'string') normalized.breadcrumbField = state['breadcrumbField'].trim();
+  if (typeof state['breadcrumbField'] === 'string') { normalized.breadcrumbField = state['breadcrumbField'].trim(); }
 
   return normalized;
 }
@@ -298,10 +298,10 @@ function dashboardRadialInteraction(value: unknown): DashboardRadialInteraction 
 }
 
 function dashboardWidgets(value: unknown): DashboardWidget[] | undefined {
-  if (!Array.isArray(value)) return undefined;
+  if (!Array.isArray(value)) { return undefined; }
   const widgets: DashboardWidget[] = [];
   for (const item of value) {
-    if (!isRecord(item) || typeof item['type'] !== 'string' || typeof item['enabled'] !== 'boolean') continue;
+    if (!isRecord(item) || typeof item['type'] !== 'string' || typeof item['enabled'] !== 'boolean') { continue; }
     widgets.push({ enabled: item['enabled'], type: item['type'] });
   }
   return widgets;
@@ -312,9 +312,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function legacyPulseCardDisplayMode(value: unknown): { desktop: PulseCardDisplayMode; mobile: PulseCardDisplayMode } | undefined {
-  if (value === 'always') return { desktop: 'always', mobile: 'always' };
-  if (value === 'contextual') return { desktop: 'contextual', mobile: 'contextual' };
-  if (value === 'contextual-desktop') return { desktop: 'contextual', mobile: 'always' };
+  if (value === 'always') { return { desktop: 'always', mobile: 'always' }; }
+  if (value === 'contextual') { return { desktop: 'contextual', mobile: 'contextual' }; }
+  if (value === 'contextual-desktop') { return { desktop: 'contextual', mobile: 'always' }; }
   return undefined;
 }
 
@@ -327,17 +327,17 @@ function pulseCardDisplayMode(value: unknown): PulseCardDisplayMode | undefined 
 }
 
 function pulseCards(value: unknown): PulseCard[] | undefined {
-  if (!Array.isArray(value)) return undefined;
+  if (!Array.isArray(value)) { return undefined; }
   const cards: PulseCard[] = [];
   for (const item of value) {
-    if (!isRecord(item) || typeof item['type'] !== 'string' || typeof item['enabled'] !== 'boolean') continue;
-    if (!(item['type'] in PULSE_CARD_LABELS)) continue;
+    if (!isRecord(item) || typeof item['type'] !== 'string' || typeof item['enabled'] !== 'boolean') { continue; }
+    if (!(item['type'] in PULSE_CARD_LABELS)) { continue; }
     const size = item['size'];
     const card: PulseCard = {
       enabled: item['enabled'],
       type: item['type'] as PulseCardType
     };
-    if (size === 1 || size === 2 || size === 3) card.size = size;
+    if (size === 1 || size === 2 || size === 3) { card.size = size; }
     const quickAction = item['quickAction'];
     if (card.type === 'quick-action' && isRecord(quickAction) && typeof quickAction['label'] === 'string' && typeof quickAction['icon'] === 'string') {
       const action: QuickAction = {
@@ -348,9 +348,9 @@ function pulseCards(value: unknown): PulseCard[] | undefined {
         iconType: quickAction['iconType'] === 'glyph' ? 'glyph' : 'lucide',
         label: quickAction['label']
       };
-      if (typeof quickAction['commandId'] === 'string') action.commandId = quickAction['commandId'];
-      if (typeof quickAction['notePath'] === 'string') action.notePath = quickAction['notePath'];
-      if (typeof quickAction['appendTemplate'] === 'string') action.appendTemplate = quickAction['appendTemplate'];
+      if (typeof quickAction['commandId'] === 'string') { action.commandId = quickAction['commandId']; }
+      if (typeof quickAction['notePath'] === 'string') { action.notePath = quickAction['notePath']; }
+      if (typeof quickAction['appendTemplate'] === 'string') { action.appendTemplate = quickAction['appendTemplate']; }
       card.quickAction = action;
     }
     cards.push(card);

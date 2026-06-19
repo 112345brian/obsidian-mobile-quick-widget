@@ -14,12 +14,12 @@ import {
 } from '../radialSlots.ts';
 import { renderSlotIcon } from '../renderQuickActionIcon.ts';
 
-type Slot = RadialSlotData;
-
 export interface SlotPos {
   left: number;
   top: number;
 }
+
+type Slot = RadialSlotData;
 
 export const STAGE_SIZE = 240;
 export const STAGE_CENTER = STAGE_SIZE / 2;

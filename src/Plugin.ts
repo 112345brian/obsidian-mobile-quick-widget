@@ -103,7 +103,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     }));
 
     this.registerEvent(this.app.metadataCache.on('changed', (file) => {
-      if (file === this.app.workspace.getActiveFile()) this.queueDashboardSidebarRefresh();
+      if (file === this.app.workspace.getActiveFile()) { this.queueDashboardSidebarRefresh(); }
     }));
 
     const workspaceEvents = this.app.workspace as unknown as WorkspaceEvents;
@@ -118,7 +118,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     _loadedSettings: ExtractReadonlyPluginSettingsWrapper<PluginTypes>,
     isInitialLoad: boolean
   ): Promise<void> {
-    if (!isInitialLoad) await this.refreshDashboardSidebars();
+    if (!isInitialLoad) { await this.refreshDashboardSidebars(); }
   }
 
   protected override async onSaveSettings(
@@ -126,7 +126,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     _oldSettings: ExtractReadonlyPluginSettingsWrapper<PluginTypes>,
     context: unknown
   ): Promise<void> {
-    if (typeof context === 'object' && context !== null && (context as { source?: unknown }).source === 'dashboard-runtime') return;
+    if (typeof context === 'object' && context !== null && (context as { source?: unknown }).source === 'dashboard-runtime') { return; }
     await this.refreshDashboardSidebars();
   }
 
@@ -158,7 +158,7 @@ export class Plugin extends PluginBase<PluginTypes> {
   private async refreshDashboardSidebars(): Promise<void> {
     await Promise.all(
       this.app.workspace.getLeavesOfType(VIEW_TYPE_DASHBOARD).map(async (leaf) => {
-        if (leaf.view instanceof DashboardView) await leaf.view.refresh();
+        if (leaf.view instanceof DashboardView) { await leaf.view.refresh(); }
       })
     );
   }
@@ -179,7 +179,7 @@ export class Plugin extends PluginBase<PluginTypes> {
     const side = this.settings.dashboardSidebarSide === 'left'
       ? (workspace.getLeftLeaf(false) ?? workspace.getLeftLeaf(true))
       : (workspace.getRightLeaf(false) ?? workspace.getRightLeaf(true));
-    if (!side) return;
+    if (!side) { return; }
     await side.setViewState({ active: true, state: state ? { ...state } : {}, type: VIEW_TYPE_DASHBOARD });
     await workspace.revealLeaf(side);
     (side.view as DashboardView).focusHost();

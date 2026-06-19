@@ -17,13 +17,13 @@ export function extractTailPreview(raw: string): string {
  * falling back to a short date once it's a week or older. */
 export function fromNow(timestamp: number): string {
   const s = Math.floor((Date.now() - timestamp) / 1000);
-  if (s < 60) return 'just now';
+  if (s < 60) { return 'just now'; }
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) { return `${m}m ago`; }
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) { return `${h}h ago`; }
   const day = Math.floor(h / 24);
-  if (day < 7) return `${day}d ago`;
+  if (day < 7) { return `${day}d ago`; }
   return new Date(timestamp).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 }
 
