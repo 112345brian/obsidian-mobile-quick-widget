@@ -481,9 +481,9 @@ export class DashboardContent {
         const workspaceEvents = this.app.workspace as unknown as WorkspaceEvents;
         const gitEventRefs = [
           workspaceEvents.on('obsidian-git:status-changed', () => { scheduleGitStatusRefresh(false); }),
-          workspaceEvents.on('obsidian-git:refreshed', () => { scheduleGitStatusRefresh(false); }),
+          workspaceEvents.on('obsidian-git:refreshed', () => { scheduleGitStatusRefresh(true); }),
           workspaceEvents.on('obsidian-git:refresh', () => { scheduleGitStatusRefresh(false); }),
-          workspaceEvents.on('obsidian-git:head-change', () => { scheduleGitStatusRefresh(false); })
+          workspaceEvents.on('obsidian-git:head-change', () => { scheduleGitStatusRefresh(true); })
         ];
         widgetCtx.onCleanup(() => {
           cancelAnimationFrame(refreshFrame);
