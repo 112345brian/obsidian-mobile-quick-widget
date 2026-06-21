@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.13 — 2026-06-21
+
+### Fixed
+- New notes created via overdrag or quick action now open in live preview instead of inheriting the homepage leaf's reading mode.
+
 ## 0.3.12 — 2026-06-19
 
 ### Fixed
