@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.14
+
+### Fixed
+- Dashboard refreshes now ignore stale async renders, TaskNotes updates remain visible after an empty state, radial press-hold cleanup removes pending global pointer listeners, and deferred sidebar dashboard leaves are loaded before refresh/focus.
+
 ## 0.3.13 — 2026-06-21
 
 ### Fixed
