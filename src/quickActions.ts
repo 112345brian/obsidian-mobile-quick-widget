@@ -8,7 +8,10 @@ import type {
   QuickAction
 } from './PluginSettings.ts';
 
-import { createNote } from './createNote.ts';
+import {
+  createNote,
+  openCreatedNoteInEditMode
+} from './createNote.ts';
 import { AppendPromptModal } from './Modals/AppendPromptModal.ts';
 
 /**
@@ -85,7 +88,7 @@ export async function executeQuickAction(
       close();
       try {
         const file = await createNote(app, settings);
-        await app.workspace.getMostRecentLeaf()?.openFile(file, { state: { mode: 'source', source: false } });
+        await openCreatedNoteInEditMode(app, file);
       } catch { /* CreateNote already surfaced a Notice */ }
       break;
     }

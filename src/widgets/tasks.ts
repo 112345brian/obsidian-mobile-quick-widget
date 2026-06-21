@@ -99,8 +99,10 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
     const draw = async (): Promise<void> => {
       const tasks = await fetchOpenTasks(api);
       card.empty();
-      // If no open tasks, remove the whole section so it doesn't take up space.
-      if (tasks.length === 0) { section.remove(); return; }
+      if (tasks.length === 0) {
+        card.createEl('div', { cls: 'qw-dash-task-loading', text: 'No open tasks' });
+        return;
+      }
       for (const task of tasks) { buildTaskRow(card, task, ctx); }
     };
 

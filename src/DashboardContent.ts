@@ -23,7 +23,10 @@ import type {
   QuickAction
 } from './PluginSettings.ts';
 
-import { createNote } from './createNote.ts';
+import {
+  createNote,
+  openCreatedNoteInEditMode
+} from './createNote.ts';
 import { getExternalPlugin } from './externalPlugin.ts';
 import { vibrate } from './haptics.ts';
 import { getModifiedTime } from './notes.ts';
@@ -132,6 +135,7 @@ export class DashboardContent {
   // Alive across opens (the sidebar), where render() itself doesn't re-run.
   private host: HTMLElement | null = null;
   private readonly isSidebar: boolean;
+  private renderGeneration = 0;
   private readonly settingsProvider: () => ReadonlyDeep<PluginSettings>;
 
   private viewState: DashboardViewState = {};
@@ -162,6 +166,7 @@ export class DashboardContent {
    *  subscribed to another plugin's live store needs to unsubscribe, or a
    *  Modal-hosted dashboard would leak a new subscription on every open. */
   public dispose(): void {
+    this.renderGeneration++;
     for (const fn of this.cleanupFns) {
       try {
         fn();
@@ -190,6 +195,8 @@ export class DashboardContent {
   /** Renders the full dashboard into `host` and wires up overdrag + keyboard nav. */
   public async render(host: HTMLElement): Promise<void> {
     this.dispose(); // In case render() is ever called again on a live instance
+    const generation = this.renderGeneration;
+    const isCurrentRender = (): boolean => generation === this.renderGeneration;
     host.empty();
     this.host = host;
     const settings = this.surfaceSettings();
@@ -215,6 +222,7 @@ export class DashboardContent {
       return w >= 260 ? 3 : 2;
     };
     await this.renderTodaySection(inner, ctx, widgets, colsFor(inner));
+    if (!isCurrentRender()) return;
 
     for (const widget of widgets) {
       if (!widget.enabled) continue;
@@ -223,7 +231,9 @@ export class DashboardContent {
       if (!definition) continue;
       try {
         await definition.render(inner, ctx);
+        if (!isCurrentRender()) return;
       } catch (err) {
+        if (!isCurrentRender()) return;
         console.error(`ReadyBoard: widget "${widget.type}" failed to render`, err);
       }
     }
@@ -391,7 +401,7 @@ export class DashboardContent {
       this.close();
       try {
         const file = await createNote(this.app, this.settings);
-        await this.app.workspace.getMostRecentLeaf()?.openFile(file, { state: { mode: 'source', source: false } });
+        await openCreatedNoteInEditMode(this.app, file);
       } catch { /* CreateNote already surfaced a Notice */ }
     };
 

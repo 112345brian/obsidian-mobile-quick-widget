@@ -86,6 +86,10 @@ export async function createNote(app: App, settings: ReadonlyDeep<PluginSettings
   return createBlankNote(app, folder, baseName, fmt);
 }
 
+export async function openCreatedNoteInEditMode(app: App, file: TFile): Promise<void> {
+  await app.workspace.getMostRecentLeaf()?.openFile(file, { state: { mode: 'source', source: false } });
+}
+
 function applyFormatTokens(fmt: string, d: Date): string {
   return fmt
     .replace(/YYYY/g, String(d.getFullYear()))

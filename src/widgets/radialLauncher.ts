@@ -92,6 +92,8 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
   const card = root.createEl('div', { cls: 'qw-dash-radial-card' });
   let cancelPress: (() => void) | null = null;
   let centerTapTimer: null | number = null;
+  let pointerCancelHandler: ((event: PointerEvent) => void) | null = null;
+  let pointerUpHandler: ((event: PointerEvent) => void) | null = null;
   let suppressClickUntil = 0;
   let stopScrollSync: (() => void) | null = null;
 
@@ -144,11 +146,16 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
   // Pointerdown target is replaced by the expanded DOM before release, so
   // Selection is resolved by hit-testing the release point manually rather
   // Than relying on a native `click`.
+  const clearPressListeners = (): void => {
+    if (pointerUpHandler) window.removeEventListener('pointerup', pointerUpHandler);
+    if (pointerCancelHandler) window.removeEventListener('pointercancel', pointerCancelHandler);
+    pointerCancelHandler = null;
+    pointerUpHandler = null;
+    cancelPress = null;
+  };
+
   const selectAtPoint = (event: PointerEvent): void => {
-    if (cancelPress) {
-      window.removeEventListener('pointercancel', cancelPress);
-      cancelPress = null;
-    }
+    clearPressListeners();
     const target = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
     const slotEl = target?.closest<HTMLElement>('[data-qw-dash-radial-slot]');
     const slotIndex = slotEl ? Number(slotEl.dataset['qwDashRadialSlot']) : Number.NaN;
@@ -163,15 +170,24 @@ function render(root: HTMLElement, ctx: DashboardWidgetContext): void {
 
   const beginPress = (event: PointerEvent): void => {
     event.preventDefault();
+    clearPressListeners();
     suppressClickUntil = Date.now() + 350;
     setExpanded(true);
     cancelPress = () => {
-      cancelPress = null;
+      clearPressListeners();
       setExpanded(false);
     };
-    window.addEventListener('pointerup', selectAtPoint, { once: true });
-    window.addEventListener('pointercancel', cancelPress, { once: true });
+    pointerUpHandler = selectAtPoint;
+    pointerCancelHandler = cancelPress;
+    window.addEventListener('pointerup', pointerUpHandler, { once: true });
+    window.addEventListener('pointercancel', pointerCancelHandler, { once: true });
   };
+
+  ctx.onCleanup(() => {
+    clearPressListeners();
+    stopScrollSync?.();
+    if (centerTapTimer !== null) window.clearTimeout(centerTapTimer);
+  });
 
   // ── Tap to toggle: tapping the center opens it and it stays open. A
   // Second tap on the center cycles to the next mode; collapsing instead

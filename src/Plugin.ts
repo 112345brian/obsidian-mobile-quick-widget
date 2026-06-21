@@ -167,13 +167,14 @@ export class Plugin extends PluginBase<PluginTypes> {
     const { workspace } = this.app;
     const existing = workspace.getLeavesOfType(VIEW_TYPE_DASHBOARD)[0];
     if (existing) {
+      await existing.loadIfDeferred();
       if (state !== undefined) {
         await existing.setViewState({ active: true, state: { ...state }, type: VIEW_TYPE_DASHBOARD });
-      } else {
-        await (existing.view as DashboardView).refresh();
+      } else if (existing.view instanceof DashboardView) {
+        await existing.view.refresh();
       }
       await workspace.revealLeaf(existing);
-      (existing.view as DashboardView).focusHost();
+      if (existing.view instanceof DashboardView) existing.view.focusHost();
       return;
     }
     const side = this.settings.dashboardSidebarSide === 'left'
