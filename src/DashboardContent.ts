@@ -391,7 +391,7 @@ export class DashboardContent {
       this.close();
       try {
         const file = await createNote(this.app, this.settings);
-        await this.app.workspace.getMostRecentLeaf()?.openFile(file);
+        await this.app.workspace.getMostRecentLeaf()?.openFile(file, { state: { mode: 'source', source: false } });
       } catch { /* CreateNote already surfaced a Notice */ }
     };
 

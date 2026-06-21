@@ -85,7 +85,7 @@ export async function executeQuickAction(
       close();
       try {
         const file = await createNote(app, settings);
-        await app.workspace.getMostRecentLeaf()?.openFile(file);
+        await app.workspace.getMostRecentLeaf()?.openFile(file, { state: { mode: 'source', source: false } });
       } catch { /* CreateNote already surfaced a Notice */ }
       break;
     }
