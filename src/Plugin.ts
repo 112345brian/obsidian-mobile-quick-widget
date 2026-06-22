@@ -103,7 +103,18 @@ export class Plugin extends PluginBase<PluginTypes> {
     }));
 
     this.registerEvent(this.app.metadataCache.on('changed', (file) => {
-      if (file === this.app.workspace.getActiveFile()) this.queueDashboardSidebarRefresh();
+      if (file !== this.app.workspace.getActiveFile()) return;
+      // Skip refresh while the user is actively editing — repeated host.empty()
+      // Calls while typing cause layout churn that dismisses the mobile keyboard.
+      // Active-leaf-change already refreshes when the user switches notes.
+      const active = document.activeElement as HTMLElement | null;
+      const isEditorFocused = active !== null && (
+        active.tagName === 'TEXTAREA'
+        || active.tagName === 'INPUT'
+        || active.isContentEditable
+      );
+      if (isEditorFocused) return;
+      this.queueDashboardSidebarRefresh();
     }));
 
     const workspaceEvents = this.app.workspace as unknown as WorkspaceEvents;

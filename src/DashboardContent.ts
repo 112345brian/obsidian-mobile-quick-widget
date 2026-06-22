@@ -184,7 +184,14 @@ export class DashboardContent {
    *  revealed (see Plugin.revealDashboardSidebar / DashboardView.focusHost). */
   public focusHost(): void {
     const host = this.host;
-    window.setTimeout(() => host?.focus(), 50);
+    window.setTimeout(() => {
+      if (!host) return;
+      // Don't steal focus if the user has already focused something outside the sidebar
+      // (e.g. they tapped a note row and the editor opened within the 50ms window).
+      const active = document.activeElement;
+      if (active && active !== document.body && !host.contains(active)) return;
+      host.focus();
+    }, 50);
   }
 
   public async refresh(): Promise<void> {
