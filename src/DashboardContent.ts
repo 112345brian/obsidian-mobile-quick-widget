@@ -332,10 +332,14 @@ export class DashboardContent {
       host.removeEventListener('keydown', onKeyDown);
     });
 
-    // Make the host focusable so keydown fires without clicking first
-    if (!host.hasAttribute('tabindex')) host.setAttribute('tabindex', '-1');
-    // Sidebar focus is managed by revealDashboardSidebar; skip here so refresh() doesn't steal focus.
-    if (!this.isSidebar) this.focusHost();
+    // Modal only: make host focusable for keyboard nav and auto-focus it.
+    // Sidebar host must NOT get tabindex — a focusable div competes with
+    // The note editor for focus (Obsidian focuses the active leaf's content
+    // Element on reveal, and host.focus() steals the keyboard on mobile).
+    if (!this.isSidebar) {
+      if (!host.hasAttribute('tabindex')) host.setAttribute('tabindex', '-1');
+      this.focusHost();
+    }
   }
 
   private attachOverdrag(scrollEl: HTMLElement, indicator: HTMLElement): void {

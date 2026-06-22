@@ -185,7 +185,6 @@ export class Plugin extends PluginBase<PluginTypes> {
         await existing.view.refresh();
       }
       await workspace.revealLeaf(existing);
-      if (existing.view instanceof DashboardView) existing.view.focusHost();
       return;
     }
     const side = this.settings.dashboardSidebarSide === 'left'
@@ -194,6 +193,5 @@ export class Plugin extends PluginBase<PluginTypes> {
     if (!side) return;
     await side.setViewState({ active: true, state: state ? { ...state } : {}, type: VIEW_TYPE_DASHBOARD });
     await workspace.revealLeaf(side);
-    (side.view as DashboardView).focusHost();
   }
 }
