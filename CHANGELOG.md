@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.3.16
+
+- fix: harden sidebar against focus seizing while typing in notes The sidebar host had tabindex="-1" which made it a focusable element. Obsidian focuses the active leaf's content element on revealLeaf(), so opening the sidebar would land keyboard focus on the host div — stealing it from the note editor and dismissing the mobile keyboard. Removed tabindex from the sidebar host entirely so it cannot receive programmatic focus. Also removed the focusHost() calls from revealDashboardSidebar() since they're now a no-op for the sidebar. Modal dashboard keeps its tabindex + auto-focus for keyboard nav. Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.3.15
 
 - fix: prevent sidebar from seizing focus while typing in notes Two paths caused ReadyBoard to steal focus from the editor: 1. focusHost()'s 50ms setTimeout could fire after the user had already    tapped a note row and the editor had gained focus — now bails if    document.activeElement is already a non-sidebar element. 2. metadataCache.changed triggered a full render (host.empty()) on every    parse cycle while typing, causing layout churn that dismisses the    mobile keyboard — now skips the refresh when an editor element is    actively focused. Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

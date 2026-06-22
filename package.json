@@ -1,6 +1,6 @@
 {
   "name": "readyboard",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "description": "Radial menu and dashboard for Obsidian — navigate breadcrumbs, run commands, and jump to recent notes with one thumb.",
   "keywords": [],
   "license": "MIT",
