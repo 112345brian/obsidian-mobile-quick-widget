@@ -1,6 +1,6 @@
 {
   "name": "readyboard",
-  "version": "0.3.16",
+  "version": "0.3.17",
   "description": "Radial menu and dashboard for Obsidian — navigate breadcrumbs, run commands, and jump to recent notes with one thumb.",
   "keywords": [],
   "license": "MIT",
@@ -37,9 +37,9 @@
     "@types/react-dom": "latest",
     "better-typescript-lib": "latest",
     "jiti": "latest",
-    "obsidian": "1.12.3",
+    "obsidian": "^1.13.1",
     "obsidian-dev-utils": "^54.0.0",
-    "obsidian-typings": "5.20.0",
+    "obsidian-typings": "^6.28.0",
     "react": "latest",
     "react-dom": "latest",
     "svelte": "latest"

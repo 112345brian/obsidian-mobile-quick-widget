@@ -1,6 +1,6 @@
 import {
-  Modal,
-  Setting
+  Setting,
+  SettingPage
 } from 'obsidian';
 
 import type { Plugin } from './Plugin.ts';
@@ -39,74 +39,176 @@ import {
   STAGE_SIZE
 } from './widgets/radialLauncher.ts';
 
-type SettingsTab = 'actions' | 'dashboard' | 'general' | 'pulse' | 'radial';
+/**
+ * Shared base for ReadyBoard's declarative-settings sub-pages (Obsidian
+ * 1.13.0's `SettingDefinitionPage.page` factory). Each tab from the old
+ * tabbed settings modal is now one navigable page, still rendered
+ * imperatively — the settings surface here (tabbed lists, drag-free
+ * reorder buttons, the SVG radial slot preview, etc.) doesn't map cleanly
+ * onto the flat `control`/`render` row model, so `SettingPage` is used as
+ * the officially-supported escape hatch for exactly this kind of surface.
+ */
+abstract class ReadyBoardSettingPage extends SettingPage {
+  protected readonly plugin: Plugin;
 
-const TABS: { id: SettingsTab; label: string }[] = [
-  { id: 'general', label: 'General' },
-  { id: 'pulse', label: 'Pulse Cards' },
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'radial', label: 'Radial' },
-  { id: 'actions', label: 'Quick Actions' }
-];
+  protected get app(): Plugin['app'] {
+    return this.plugin.app;
+  }
 
-export class ReadyBoardSettingsModal extends Modal {
-  private activeRadialSlot = 0;
-  private activeTab: SettingsTab = 'general';
-  private body!: HTMLElement;
-  private readonly plugin: Plugin;
-  private readonly tabBtns = new Map<SettingsTab, HTMLElement>();
+  /** Live, mutable settings reference — the same object the plugin's
+   *  settingsManager persists. Mutating it directly and then calling
+   *  `save()` mirrors the pattern the old modal used. */
+  protected get s(): PluginSettings {
+    return this.plugin.settingsManager.settingsWrapper.settings as unknown as PluginSettings;
+  }
 
   constructor(plugin: Plugin) {
-    super(plugin.app);
+    super();
     this.plugin = plugin;
   }
 
-  override onClose(): void {
-    this.contentEl.empty();
-  }
-
-  override onOpen(): void {
-    this.modalEl.addClass('qw-settings-modal');
-    this.titleEl.setText('ReadyBoard Settings');
-    this.renderInto(this.contentEl);
-  }
-
-  /** Renders the full settings UI into any container — used by both the modal
-   *  (via onOpen) and the native Obsidian settings tab (inline, no modal). */
-  public renderInto(container: HTMLElement): void {
-    container.empty();
-    const s = this.plugin.settingsManager.settingsWrapper.settings as unknown as PluginSettings;
-    const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.plugin.dashboardWidgetRegistry.ids()])];
-    s.dashboardWidgets = normalizeDashboardWidgets(s.dashboardWidgets, knownIds);
-
-    const tabBar = container.createDiv('qw-settings-tab-bar');
-    for (const { id, label } of TABS) {
-      const btn = tabBar.createEl('button', { cls: 'qw-settings-tab-btn', text: label });
-      if (id === this.activeTab) btn.addClass('is-active');
-      btn.onclick = () => {
-        this.switchTab(id);
-      };
-      this.tabBtns.set(id, btn);
-    }
-
-    this.body = container.createDiv('qw-settings-body');
-    this.renderTab();
-  }
-
-  private clonePulseCard(card: PulseCard): PulseCard {
+  protected clonePulseCard(card: PulseCard): PulseCard {
     const clone: PulseCard = { ...card };
     if (card.quickAction) clone.quickAction = { ...card.quickAction };
     return clone;
   }
 
-  private redraw(): void {
-    const scrollTop = this.body.scrollTop;
-    this.renderTab();
-    this.body.scrollTop = scrollTop;
+  protected redraw(): void {
+    const scrollTop = this.containerEl.scrollTop;
+    this.display();
+    this.containerEl.scrollTop = scrollTop;
   }
 
-  private renderActions(s: PluginSettings, save: () => void): void {
-    const el = this.body;
+  /** Shared by the Radial (command slots) and Quick Actions tabs. */
+  protected renderQuickActionFields(
+    el: HTMLElement,
+    actions: QuickAction[],
+    i: number,
+    save: () => void,
+    opts: { removable: boolean }
+  ): void {
+    const action = actions[i];
+    if (!action) return;
+
+    new Setting(el).setName('Label')
+      .addText((t) => {
+        t.setValue(action.label).onChange((v) => {
+          action.label = v;
+        });
+        this.saveTextOnCommit(t.inputEl, save);
+      });
+
+    new Setting(el).setName('Icon')
+      .setDesc(action.iconType === 'glyph' ? 'Literal glyph, e.g. ✦' : 'Lucide icon name — lucide.dev')
+      .addText((t) => {
+        t.setPlaceholder('zap').setValue(action.icon).onChange((v) => {
+          action.icon = v;
+        });
+        this.saveTextOnCommit(t.inputEl, save);
+      })
+      .addDropdown((dd) =>
+        dd.addOption('lucide', 'Lucide').addOption('glyph', 'Glyph')
+          .setValue(action.iconType ?? 'lucide').onChange((v) => {
+            action.iconType = v as QuickActionIconType;
+            save();
+            this.redraw();
+          })
+      );
+
+    new Setting(el).setName('Action type')
+      .addDropdown((dd) =>
+        dd
+          .addOption('new-note', 'Create new note').addOption('homepage', 'Open homepage')
+          .addOption('command', 'Run command').addOption('append-to-note', 'Append to note')
+          .setValue(action.action).onChange((v) => {
+            action.action = v as QuickAction['action'];
+            save();
+            this.redraw();
+          })
+      );
+
+    if (action.action === 'command') {
+      new Setting(el).setName('Command').setDesc(action.commandId ? `ID: ${action.commandId}` : 'No command selected')
+        .addButton((btn) =>
+          btn.setButtonText(action.commandId ? 'Change…' : 'Choose command…').onClick(() => {
+            new CommandPickerModal(this.app, (cmd) => {
+              action.commandId = cmd.id;
+              save();
+              this.redraw();
+            }).open();
+          })
+        );
+    }
+
+    if (action.action === 'append-to-note') {
+      new Setting(el).setName('Target note').setDesc('Path to append to, e.g. "Inbox/Tasks.md"')
+        .addText((t) => {
+          t.setPlaceholder('Inbox/Tasks.md').setValue(action.notePath ?? '')
+            .onChange((v) => {
+              action.notePath = v.trim();
+            });
+          this.saveTextOnCommit(t.inputEl, save);
+        });
+      new Setting(el).setName('Append template').setDesc('{{text}} is replaced with your input.')
+        .addText((t) => {
+          t.setPlaceholder('- [ ] {{text}}').setValue(action.appendTemplate ?? '')
+            .onChange((v) => {
+              action.appendTemplate = v.trim();
+            });
+          this.saveTextOnCommit(t.inputEl, save);
+        });
+    }
+
+    if (opts.removable) {
+      new Setting(el).addButton((btn) =>
+        btn.setButtonText('Remove').setDestructive().onClick(() => {
+          actions.splice(i, 1);
+          save();
+          this.redraw();
+        })
+      );
+    }
+
+    el.createEl('hr');
+  }
+
+  protected readonly save = (): void => {
+    void this.plugin.settingsManager.editAndSave(() => undefined, { source: 'settings-ui' });
+  };
+
+  protected saveTextOnCommit(inputEl: HTMLInputElement | HTMLTextAreaElement, save: () => void, multiline = false): void {
+    let savedValue = inputEl.value;
+    const commit = (): void => {
+      if (inputEl.value === savedValue) return;
+      savedValue = inputEl.value;
+      save();
+    };
+    const onKeyDown = (event: Event): void => {
+      if (!(event instanceof KeyboardEvent)) return;
+      if (event.key !== 'Enter') return;
+      if (multiline && !event.metaKey && !event.ctrlKey) return;
+      if (!multiline) event.preventDefault();
+      commit();
+    };
+
+    inputEl.addEventListener('blur', commit);
+    inputEl.addEventListener('keydown', onKeyDown);
+  }
+}
+
+// ── Quick Actions ─────────────────────────────────────────────────────────
+
+export class ActionsSettingsPage extends ReadyBoardSettingPage {
+  constructor(plugin: Plugin) {
+    super(plugin);
+    this.title = 'Quick Actions';
+  }
+
+  override display(): void {
+    const el = this.containerEl;
+    el.empty();
+    const s = this.s;
+    const save = this.save;
     el.createEl('p', { cls: 'setting-item-description', text: 'Buttons in the dashboard Quick Actions section.' });
 
     const actions = s.quickActions;
@@ -131,10 +233,23 @@ export class ReadyBoardSettingsModal extends Modal {
         })
       );
   }
+}
 
-  private renderDashboard(s: PluginSettings, save: () => void): void {
-    const el = this.body;
+// ── Dashboard ─────────────────────────────────────────────────────────────
+
+export class DashboardSettingsPage extends ReadyBoardSettingPage {
+  constructor(plugin: Plugin) {
+    super(plugin);
+    this.title = 'Dashboard';
+  }
+
+  override display(): void {
+    const el = this.containerEl;
+    el.empty();
+    const s = this.s;
+    const save = this.save;
     const knownIds = [...new Set([...BUILTIN_DASHBOARD_WIDGET_TYPES, ...this.plugin.dashboardWidgetRegistry.ids()])];
+    s.dashboardWidgets = normalizeDashboardWidgets(s.dashboardWidgets, knownIds);
 
     // ── Shared settings ──
     new Setting(el).setName('Overdrag to new note').setDesc('Pull down past the top of the dashboard to instantly create a new note.')
@@ -250,40 +365,178 @@ export class ReadyBoardSettingsModal extends Modal {
     }
   }
 
-  private renderDashboardRadialSettings(
+  private renderNoteCardSettings(
     el: HTMLElement,
     s: PluginSettings,
     surface: 'modal' | 'sidebar',
     save: () => void
   ): void {
     const isSidebar = surface === 'sidebar';
-    new Setting(el).setName('Dashboard radial section')
-      .addDropdown((d) =>
-        d.addOption('breadcrumbs', 'Breadcrumbs').addOption('commands', 'Commands').addOption('recents', 'Recents')
-          .setValue(isSidebar ? s.sidebarDashboardRadialMode : s.dashboardRadialMode)
+    el.createEl('h3', { text: 'Note Cards' });
+    new Setting(el).setName('Show tags').addToggle((t) =>
+      t
+        .setValue(isSidebar ? s.sidebarCardShowTags : s.cardShowTags)
+        .onChange((v) => {
+          if (isSidebar) s.sidebarCardShowTags = v;
+          else s.cardShowTags = v;
+          save();
+        })
+    );
+    new Setting(el).setName('Show backlink count').addToggle((t) =>
+      t
+        .setValue(isSidebar ? s.sidebarCardShowBacklinks : s.cardShowBacklinks)
+        .onChange((v) => {
+          if (isSidebar) s.sidebarCardShowBacklinks = v;
+          else s.cardShowBacklinks = v;
+          save();
+        })
+    );
+    new Setting(el).setName('Show preview').setDesc('Short text excerpt from the note body.')
+      .addToggle((t) =>
+        t
+          .setValue(isSidebar ? s.sidebarCardShowPreview : s.cardShowPreview)
           .onChange((v) => {
-            if (isSidebar) s.sidebarDashboardRadialMode = v as RadialMode;
-            else s.dashboardRadialMode = v as RadialMode;
+            if (isSidebar) s.sidebarCardShowPreview = v;
+            else s.cardShowPreview = v;
             save();
           })
       );
-
-    new Setting(el).setName('Dashboard radial interaction')
-      .addDropdown((d) =>
-        d.addOption('press-hold', 'Press & hold').addOption('tap-toggle', 'Tap to toggle')
-          .setValue(isSidebar ? s.sidebarDashboardRadialInteraction : s.dashboardRadialInteraction)
+    new Setting(el).setName('Show breadcrumbs').setDesc('Show parent note above each item in the list.')
+      .addToggle((t) =>
+        t
+          .setValue(isSidebar ? s.sidebarShowBreadcrumbs : s.showBreadcrumbs)
           .onChange((v) => {
-            if (isSidebar) s.sidebarDashboardRadialInteraction = v as DashboardRadialInteraction;
-            else s.dashboardRadialInteraction = v as DashboardRadialInteraction;
+            if (isSidebar) s.sidebarShowBreadcrumbs = v;
+            else s.showBreadcrumbs = v;
             save();
           })
       );
+    new Setting(el).setName('Breadcrumb field override').setDesc('Custom frontmatter field for parent. Leave blank to use "up".')
+      .addText((t) => {
+        t.setPlaceholder('up')
+          .setValue(isSidebar ? s.sidebarBreadcrumbField : s.breadcrumbField)
+          .onChange((v) => {
+            if (isSidebar) s.sidebarBreadcrumbField = v.trim();
+            else s.breadcrumbField = v.trim();
+          });
+        this.saveTextOnCommit(t.inputEl, save);
+      });
+    new Setting(el).setName('Extra frontmatter fields').setDesc('One per line (e.g. status, type). Shows only when present.')
+      .addTextArea((t) => {
+        t.setPlaceholder('status\ntype')
+          .setValue((isSidebar ? s.sidebarCardFrontmatterFields : s.cardFrontmatterFields).join('\n'))
+          .onChange((v) => {
+            const fields = v.split('\n').map((f) => f.trim()).filter(Boolean);
+            if (isSidebar) s.sidebarCardFrontmatterFields = fields;
+            else s.cardFrontmatterFields = fields;
+          });
+        this.saveTextOnCommit(t.inputEl, save, true);
+      });
   }
 
-  // ── General ──────────────────────────────────────────────────────────────
+  private renderWidgetList(
+    el: HTMLElement,
+    s: PluginSettings,
+    surface: 'modal' | 'sidebar',
+    knownIds: string[],
+    save: () => void
+  ): void {
+    const isSidebar = surface === 'sidebar';
+    el.createEl('h3', { text: 'Widgets' });
 
-  private renderGeneral(s: PluginSettings, save: () => void): void {
-    const el = this.body;
+    const presetSetting = new Setting(el).setName('Presets');
+    for (const preset of Object.values(DASHBOARD_PRESETS) as { label: string; widgets: DashboardWidget[] }[]) {
+      presetSetting.addButton((btn) =>
+        btn.setButtonText(preset.label).onClick(() => {
+          const normalized = normalizeDashboardWidgets(
+            preset.widgets.map((w) => ({ enabled: w.enabled, type: w.type })),
+            knownIds
+          );
+          if (isSidebar) s.sidebarWidgets = normalized;
+          else s.dashboardWidgets = normalized;
+          save();
+          this.redraw();
+        })
+      );
+    }
+
+    const raw = isSidebar ? (s.sidebarWidgets) : (s.dashboardWidgets);
+    const widgets = normalizeDashboardWidgets(raw, knownIds);
+    if (isSidebar) s.sidebarWidgets = widgets;
+    else s.dashboardWidgets = widgets;
+
+    for (let i = 0; i < widgets.length; i++) {
+      const widget = widgets[i];
+      if (!widget) continue;
+      const label = this.plugin.dashboardWidgetRegistry.get(widget.type)?.label ?? widget.type;
+      new Setting(el).setName(label)
+        .addToggle((t) =>
+          t.setValue(widget.enabled).onChange((v) => {
+            widget.enabled = v;
+            save();
+          })
+        )
+        .addExtraButton((btn) =>
+          btn.setIcon('arrow-up').setTooltip('Move up').onClick(() => {
+            if (i === 0) return;
+            const prev = widgets[i - 1];
+            const curr = widgets[i];
+            if (prev && curr) {
+              widgets[i - 1] = curr;
+              widgets[i] = prev;
+            }
+            save();
+            this.redraw();
+          })
+        )
+        .addExtraButton((btn) =>
+          btn.setIcon('arrow-down').setTooltip('Move down').onClick(() => {
+            if (i === widgets.length - 1) return;
+            const next = widgets[i + 1];
+            const curr = widgets[i];
+            if (next && curr) {
+              widgets[i + 1] = curr;
+              widgets[i] = next;
+            }
+            save();
+            this.redraw();
+          })
+        );
+    }
+  }
+
+  private seedSidebarDashboardSettings(s: PluginSettings, knownIds: string[]): void {
+    s.sidebarWidgets = normalizeDashboardWidgets(s.dashboardWidgets, knownIds).map((w) => ({ ...w }));
+    s.sidebarPulseCards = (s.pulseCards ?? []).map((card) => this.clonePulseCard(card));
+    s.sidebarPulseCardDesktopDisplayMode = s.pulseCardDesktopDisplayMode;
+    s.sidebarPulseCardMobileDisplayMode = s.pulseCardMobileDisplayMode;
+    s.sidebarRecentListCount = s.recentListCount;
+    s.sidebarModifiedListCount = s.modifiedListCount;
+    s.sidebarDashboardRadialMode = s.dashboardRadialMode;
+    s.sidebarDashboardRadialLastMode = s.dashboardRadialLastMode;
+    s.sidebarDashboardRadialInteraction = s.dashboardRadialInteraction;
+    s.sidebarShowBreadcrumbs = s.showBreadcrumbs;
+    s.sidebarBreadcrumbField = s.breadcrumbField;
+    s.sidebarCardShowTags = s.cardShowTags;
+    s.sidebarCardShowPreview = s.cardShowPreview;
+    s.sidebarCardShowBacklinks = s.cardShowBacklinks;
+    s.sidebarCardFrontmatterFields = [...(s.cardFrontmatterFields ?? [])];
+  }
+}
+
+// ── General ────────────────────────────────────────────────────────────────
+
+export class GeneralSettingsPage extends ReadyBoardSettingPage {
+  constructor(plugin: Plugin) {
+    super(plugin);
+    this.title = 'General';
+  }
+
+  override display(): void {
+    const el = this.containerEl;
+    el.empty();
+    const s = this.s;
+    const save = this.save;
 
     new Setting(el)
       .setName('Homepage file path')
@@ -365,80 +618,21 @@ export class ReadyBoardSettingsModal extends Modal {
       true
     );
   }
+}
 
-  // ── Pulse Cards ───────────────────────────────────────────────────────────
+// ── Pulse Cards ───────────────────────────────────────────────────────────
 
-  private renderNoteCardSettings(
-    el: HTMLElement,
-    s: PluginSettings,
-    surface: 'modal' | 'sidebar',
-    save: () => void
-  ): void {
-    const isSidebar = surface === 'sidebar';
-    el.createEl('h3', { text: 'Note Cards' });
-    new Setting(el).setName('Show tags').addToggle((t) =>
-      t
-        .setValue(isSidebar ? s.sidebarCardShowTags : s.cardShowTags)
-        .onChange((v) => {
-          if (isSidebar) s.sidebarCardShowTags = v;
-          else s.cardShowTags = v;
-          save();
-        })
-    );
-    new Setting(el).setName('Show backlink count').addToggle((t) =>
-      t
-        .setValue(isSidebar ? s.sidebarCardShowBacklinks : s.cardShowBacklinks)
-        .onChange((v) => {
-          if (isSidebar) s.sidebarCardShowBacklinks = v;
-          else s.cardShowBacklinks = v;
-          save();
-        })
-    );
-    new Setting(el).setName('Show preview').setDesc('Short text excerpt from the note body.')
-      .addToggle((t) =>
-        t
-          .setValue(isSidebar ? s.sidebarCardShowPreview : s.cardShowPreview)
-          .onChange((v) => {
-            if (isSidebar) s.sidebarCardShowPreview = v;
-            else s.cardShowPreview = v;
-            save();
-          })
-      );
-    new Setting(el).setName('Show breadcrumbs').setDesc('Show parent note above each item in the list.')
-      .addToggle((t) =>
-        t
-          .setValue(isSidebar ? s.sidebarShowBreadcrumbs : s.showBreadcrumbs)
-          .onChange((v) => {
-            if (isSidebar) s.sidebarShowBreadcrumbs = v;
-            else s.showBreadcrumbs = v;
-            save();
-          })
-      );
-    new Setting(el).setName('Breadcrumb field override').setDesc('Custom frontmatter field for parent. Leave blank to use "up".')
-      .addText((t) => {
-        t.setPlaceholder('up')
-          .setValue(isSidebar ? s.sidebarBreadcrumbField : s.breadcrumbField)
-          .onChange((v) => {
-            if (isSidebar) s.sidebarBreadcrumbField = v.trim();
-            else s.breadcrumbField = v.trim();
-          });
-        this.saveTextOnCommit(t.inputEl, save);
-      });
-    new Setting(el).setName('Extra frontmatter fields').setDesc('One per line (e.g. status, type). Shows only when present.')
-      .addTextArea((t) => {
-        t.setPlaceholder('status\ntype')
-          .setValue((isSidebar ? s.sidebarCardFrontmatterFields : s.cardFrontmatterFields).join('\n'))
-          .onChange((v) => {
-            const fields = v.split('\n').map((f) => f.trim()).filter(Boolean);
-            if (isSidebar) s.sidebarCardFrontmatterFields = fields;
-            else s.cardFrontmatterFields = fields;
-          });
-        this.saveTextOnCommit(t.inputEl, save, true);
-      });
+export class PulseSettingsPage extends ReadyBoardSettingPage {
+  constructor(plugin: Plugin) {
+    super(plugin);
+    this.title = 'Pulse Cards';
   }
 
-  private renderPulse(s: PluginSettings, save: () => void): void {
-    const el = this.body;
+  override display(): void {
+    const el = this.containerEl;
+    el.empty();
+    const s = this.s;
+    const save = this.save;
     const cardLists = s.dashboardSeparateSettings
       ? [s.pulseCards, s.sidebarPulseCards]
       : [s.pulseCards];
@@ -583,8 +777,6 @@ export class ReadyBoardSettingsModal extends Modal {
     };
   }
 
-  // ── Dashboard ─────────────────────────────────────────────────────────────
-
   private renderPulseDisplayMode(
     el: HTMLElement,
     s: PluginSettings,
@@ -622,101 +814,23 @@ export class ReadyBoardSettingsModal extends Modal {
           })
       );
   }
+}
 
-  private renderQuickActionFields(
-    el: HTMLElement,
-    actions: QuickAction[],
-    i: number,
-    save: () => void,
-    opts: { removable: boolean }
-  ): void {
-    const action = actions[i];
-    if (!action) return;
+// ── Radial ────────────────────────────────────────────────────────────────
 
-    new Setting(el).setName('Label')
-      .addText((t) => {
-        t.setValue(action.label).onChange((v) => {
-          action.label = v;
-        });
-        this.saveTextOnCommit(t.inputEl, save);
-      });
+export class RadialSettingsPage extends ReadyBoardSettingPage {
+  private activeRadialSlot = 0;
 
-    new Setting(el).setName('Icon')
-      .setDesc(action.iconType === 'glyph' ? 'Literal glyph, e.g. ✦' : 'Lucide icon name — lucide.dev')
-      .addText((t) => {
-        t.setPlaceholder('zap').setValue(action.icon).onChange((v) => {
-          action.icon = v;
-        });
-        this.saveTextOnCommit(t.inputEl, save);
-      })
-      .addDropdown((dd) =>
-        dd.addOption('lucide', 'Lucide').addOption('glyph', 'Glyph')
-          .setValue(action.iconType ?? 'lucide').onChange((v) => {
-            action.iconType = v as QuickActionIconType;
-            save();
-            this.redraw();
-          })
-      );
-
-    new Setting(el).setName('Action type')
-      .addDropdown((dd) =>
-        dd
-          .addOption('new-note', 'Create new note').addOption('homepage', 'Open homepage')
-          .addOption('command', 'Run command').addOption('append-to-note', 'Append to note')
-          .setValue(action.action).onChange((v) => {
-            action.action = v as QuickAction['action'];
-            save();
-            this.redraw();
-          })
-      );
-
-    if (action.action === 'command') {
-      new Setting(el).setName('Command').setDesc(action.commandId ? `ID: ${action.commandId}` : 'No command selected')
-        .addButton((btn) =>
-          btn.setButtonText(action.commandId ? 'Change…' : 'Choose command…').onClick(() => {
-            new CommandPickerModal(this.app, (cmd) => {
-              action.commandId = cmd.id;
-              save();
-              this.redraw();
-            }).open();
-          })
-        );
-    }
-
-    if (action.action === 'append-to-note') {
-      new Setting(el).setName('Target note').setDesc('Path to append to, e.g. "Inbox/Tasks.md"')
-        .addText((t) => {
-          t.setPlaceholder('Inbox/Tasks.md').setValue(action.notePath ?? '')
-            .onChange((v) => {
-              action.notePath = v.trim();
-            });
-          this.saveTextOnCommit(t.inputEl, save);
-        });
-      new Setting(el).setName('Append template').setDesc('{{text}} is replaced with your input.')
-        .addText((t) => {
-          t.setPlaceholder('- [ ] {{text}}').setValue(action.appendTemplate ?? '')
-            .onChange((v) => {
-              action.appendTemplate = v.trim();
-            });
-          this.saveTextOnCommit(t.inputEl, save);
-        });
-    }
-
-    if (opts.removable) {
-      new Setting(el).addButton((btn) =>
-        btn.setButtonText('Remove').setWarning().onClick(() => {
-          actions.splice(i, 1);
-          save();
-          this.redraw();
-        })
-      );
-    }
-
-    el.createEl('hr');
+  constructor(plugin: Plugin) {
+    super(plugin);
+    this.title = 'Radial';
   }
 
-  private renderRadial(s: PluginSettings, save: () => void): void {
-    const el = this.body;
+  override display(): void {
+    const el = this.containerEl;
+    el.empty();
+    const s = this.s;
+    const save = this.save;
 
     new Setting(el).setName('Default mode')
       .addDropdown((d) =>
@@ -775,7 +889,35 @@ export class ReadyBoardSettingsModal extends Modal {
     );
   }
 
-  // ── Radial ────────────────────────────────────────────────────────────────
+  private renderDashboardRadialSettings(
+    el: HTMLElement,
+    s: PluginSettings,
+    surface: 'modal' | 'sidebar',
+    save: () => void
+  ): void {
+    const isSidebar = surface === 'sidebar';
+    new Setting(el).setName('Dashboard radial section')
+      .addDropdown((d) =>
+        d.addOption('breadcrumbs', 'Breadcrumbs').addOption('commands', 'Commands').addOption('recents', 'Recents')
+          .setValue(isSidebar ? s.sidebarDashboardRadialMode : s.dashboardRadialMode)
+          .onChange((v) => {
+            if (isSidebar) s.sidebarDashboardRadialMode = v as RadialMode;
+            else s.dashboardRadialMode = v as RadialMode;
+            save();
+          })
+      );
+
+    new Setting(el).setName('Dashboard radial interaction')
+      .addDropdown((d) =>
+        d.addOption('press-hold', 'Press & hold').addOption('tap-toggle', 'Tap to toggle')
+          .setValue(isSidebar ? s.sidebarDashboardRadialInteraction : s.dashboardRadialInteraction)
+          .onChange((v) => {
+            if (isSidebar) s.sidebarDashboardRadialInteraction = v as DashboardRadialInteraction;
+            else s.dashboardRadialInteraction = v as DashboardRadialInteraction;
+            save();
+          })
+      );
+  }
 
   private renderRadialPreview(el: HTMLElement, commands: QuickAction[]): void {
     const wrap = el.createDiv('qw-settings-radial-preview');
@@ -828,150 +970,5 @@ export class ReadyBoardSettingsModal extends Modal {
         this.redraw();
       });
     }
-  }
-
-  private renderTab(): void {
-    this.body.empty();
-    const s = this.plugin.settingsManager.settingsWrapper.settings as unknown as PluginSettings;
-    const save = (): void => {
-      void this.plugin.settingsManager.editAndSave(() => undefined, { source: 'settings-ui' });
-    };
-
-    switch (this.activeTab) {
-      case 'actions':
-        this.renderActions(s, save);
-        break;
-      case 'dashboard':
-        this.renderDashboard(s, save);
-        break;
-      case 'general':
-        this.renderGeneral(s, save);
-        break;
-      case 'pulse':
-        this.renderPulse(s, save);
-        break;
-      case 'radial':
-        this.renderRadial(s, save);
-        break;
-    }
-  }
-
-  private renderWidgetList(
-    el: HTMLElement,
-    s: PluginSettings,
-    surface: 'modal' | 'sidebar',
-    knownIds: string[],
-    save: () => void
-  ): void {
-    const isSidebar = surface === 'sidebar';
-    el.createEl('h3', { text: 'Widgets' });
-
-    const presetSetting = new Setting(el).setName('Presets');
-    for (const preset of Object.values(DASHBOARD_PRESETS) as { label: string; widgets: DashboardWidget[] }[]) {
-      presetSetting.addButton((btn) =>
-        btn.setButtonText(preset.label).onClick(() => {
-          const normalized = normalizeDashboardWidgets(
-            preset.widgets.map((w) => ({ enabled: w.enabled, type: w.type })),
-            knownIds
-          );
-          if (isSidebar) s.sidebarWidgets = normalized;
-          else s.dashboardWidgets = normalized;
-          save();
-          this.redraw();
-        })
-      );
-    }
-
-    const raw = isSidebar ? (s.sidebarWidgets) : (s.dashboardWidgets);
-    const widgets = normalizeDashboardWidgets(raw, knownIds);
-    if (isSidebar) s.sidebarWidgets = widgets;
-    else s.dashboardWidgets = widgets;
-
-    for (let i = 0; i < widgets.length; i++) {
-      const widget = widgets[i];
-      if (!widget) continue;
-      const label = this.plugin.dashboardWidgetRegistry.get(widget.type)?.label ?? widget.type;
-      new Setting(el).setName(label)
-        .addToggle((t) =>
-          t.setValue(widget.enabled).onChange((v) => {
-            widget.enabled = v;
-            save();
-          })
-        )
-        .addExtraButton((btn) =>
-          btn.setIcon('arrow-up').setTooltip('Move up').onClick(() => {
-            if (i === 0) return;
-            const prev = widgets[i - 1];
-            const curr = widgets[i];
-            if (prev && curr) {
-              widgets[i - 1] = curr;
-              widgets[i] = prev;
-            }
-            save();
-            this.redraw();
-          })
-        )
-        .addExtraButton((btn) =>
-          btn.setIcon('arrow-down').setTooltip('Move down').onClick(() => {
-            if (i === widgets.length - 1) return;
-            const next = widgets[i + 1];
-            const curr = widgets[i];
-            if (next && curr) {
-              widgets[i + 1] = curr;
-              widgets[i] = next;
-            }
-            save();
-            this.redraw();
-          })
-        );
-    }
-  }
-
-  // ── Quick Actions ─────────────────────────────────────────────────────────
-
-  private saveTextOnCommit(inputEl: HTMLInputElement | HTMLTextAreaElement, save: () => void, multiline = false): void {
-    let savedValue = inputEl.value;
-    const commit = (): void => {
-      if (inputEl.value === savedValue) return;
-      savedValue = inputEl.value;
-      save();
-    };
-    const onKeyDown = (event: Event): void => {
-      if (!(event instanceof KeyboardEvent)) return;
-      if (event.key !== 'Enter') return;
-      if (multiline && !event.metaKey && !event.ctrlKey) return;
-      if (!multiline) event.preventDefault();
-      commit();
-    };
-
-    inputEl.addEventListener('blur', commit);
-    inputEl.addEventListener('keydown', onKeyDown);
-  }
-
-  private seedSidebarDashboardSettings(s: PluginSettings, knownIds: string[]): void {
-    s.sidebarWidgets = normalizeDashboardWidgets(s.dashboardWidgets, knownIds).map((w) => ({ ...w }));
-    s.sidebarPulseCards = (s.pulseCards ?? []).map((card) => this.clonePulseCard(card));
-    s.sidebarPulseCardDesktopDisplayMode = s.pulseCardDesktopDisplayMode;
-    s.sidebarPulseCardMobileDisplayMode = s.pulseCardMobileDisplayMode;
-    s.sidebarRecentListCount = s.recentListCount;
-    s.sidebarModifiedListCount = s.modifiedListCount;
-    s.sidebarDashboardRadialMode = s.dashboardRadialMode;
-    s.sidebarDashboardRadialLastMode = s.dashboardRadialLastMode;
-    s.sidebarDashboardRadialInteraction = s.dashboardRadialInteraction;
-    s.sidebarShowBreadcrumbs = s.showBreadcrumbs;
-    s.sidebarBreadcrumbField = s.breadcrumbField;
-    s.sidebarCardShowTags = s.cardShowTags;
-    s.sidebarCardShowPreview = s.cardShowPreview;
-    s.sidebarCardShowBacklinks = s.cardShowBacklinks;
-    s.sidebarCardFrontmatterFields = [...(s.cardFrontmatterFields ?? [])];
-  }
-
-  // ── Quick action field block (shared by Radial and Quick Actions) ─────────
-
-  private switchTab(tab: SettingsTab): void {
-    this.tabBtns.get(this.activeTab)?.removeClass('is-active');
-    this.activeTab = tab;
-    this.tabBtns.get(tab)?.addClass('is-active');
-    this.renderTab();
   }
 }

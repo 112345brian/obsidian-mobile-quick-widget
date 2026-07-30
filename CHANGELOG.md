@@ -1,5 +1,14 @@
 # CHANGELOG
 
+<!-- towncrier release notes start -->
+
+## 0.3.17
+
+### Changed
+
+- Migrated settings UI to Obsidian's new declarative settings API (requires Obsidian 1.13.0+).
+
+
 ## 0.3.16
 
 - fix: harden sidebar against focus seizing while typing in notes The sidebar host had tabindex="-1" which made it a focusable element. Obsidian focuses the active leaf's content element on revealLeaf(), so opening the sidebar would land keyboard focus on the host div — stealing it from the note editor and dismissing the mobile keyboard. Removed tabindex from the sidebar host entirely so it cannot receive programmatic focus. Also removed the focusHost() calls from revealDashboardSidebar() since they're now a no-op for the sidebar. Modal dashboard keeps its tabindex + auto-focus for keyboard nav. Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

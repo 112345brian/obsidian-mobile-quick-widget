@@ -4,7 +4,7 @@
   "description": "Mobile radial menu and dashboard for Obsidian — navigate breadcrumbs, run commands, and jump to recent notes with one thumb.",
   "id": "readyboard",
   "isDesktopOnly": false,
-  "minAppVersion": "1.12.7",
+  "minAppVersion": "1.13.0",
   "name": "ReadyBoard",
-  "version": "0.3.16"
+  "version": "0.3.17"
 }
